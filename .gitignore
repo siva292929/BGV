@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Security (CRITICAL)
+.env
+
+# Candidate Uploads
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Production Builds
+dist/
+build/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
