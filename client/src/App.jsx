@@ -1,26 +1,44 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
-import HRDashboard from './pages/HRDashboard'; // <--- IMPORT THIS
+import HRDashboard from './pages/HRDashboard';
+import AgentDashboard from './pages/AgentDashboard';
+import CandidatePortal from './pages/CandidatePortal'; // Ensure this file is created next
 import ResetPassword from './pages/ResetPassword';
 
-// Keep this placeholder until we build the Candidate Portal next
-const CandidateHome = () => <div className="p-10 text-2xl font-bold text-orange-600">Candidate Portal - Upload Your Docs Here</div>;
+/**
+ * PROTECTED ROUTE COMPONENT (Optional Improvement)
+ * You can wrap routes with this to check localStorage for the correct role 
+ * before allowing access. For now, we are using direct routing.
+ */
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
-        
-        {/* Real HR Dashboard */}
-        <Route path="/dashboard" element={<HRDashboard />} />
-        
-        <Route path="/candidate-home" element={<CandidateHome />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      <div className="min-h-screen bg-gray-50">
+        <Routes>
+          {/* Public Route: Login is the entry point */}
+          <Route path="/" element={<Login />} />
+
+          {/* Security Route: Forced for first-time login users */}
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Admin Routes: Manage HR and Agents */}
+          <Route path="/admin-dashboard" element={<AdminDashboard />} />
+
+          {/* HR Routes: Create Candidates and view pipeline */}
+          <Route path="/dashboard" element={<HRDashboard />} />
+
+          {/* Agent Routes: Review assigned candidates and documents */}
+          <Route path="/agent-dashboard" element={<AgentDashboard />} />
+
+          {/* Candidate Routes: Phone OTP, Auto-Fetch, and Document Upload */}
+          <Route path="/candidate-home" element={<CandidatePortal />} />
+
+          {/* Fallback: Redirect any unknown URL to Login */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </div>
     </BrowserRouter>
   );
 }

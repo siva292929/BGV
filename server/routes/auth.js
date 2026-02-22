@@ -18,6 +18,9 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET || 'secret123'
     );
 
+    // Logging for Demo Debugging
+    console.log(`User Logged In: ${user.email} | isFirstLogin: ${user.isFirstLogin}`);
+
     res.json({ 
       token, 
       role: user.role, 
