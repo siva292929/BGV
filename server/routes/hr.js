@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
+const CandidateSubmission = require('../models/CandidateSubmission');
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -59,8 +60,29 @@ router.post('/create-candidate', async (req, res) => {
 
 router.get('/candidates', async (req, res) => {
   try {
-    const candidates = await User.find({ role: 'CANDIDATE' }).populate('assignedAgent', 'name');
+    const candidates = await User.find({ role: 'CANDIDATE' }).populate('assignedAgent', 'name').sort({ createdAt: -1 });
     res.json(candidates);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET CANDIDATE DETAILED PROGRESS
+router.get('/candidate-progress/:id', async (req, res) => {
+  try {
+    const candidate = await User.findById(req.params.id)
+      .populate('assignedAgent', 'name')
+      .populate('bgvRequest');
+
+    if (!candidate) return res.status(404).json({ error: "Candidate not found" });
+
+    // Fetch submission details if exist
+    const submission = await CandidateSubmission.findOne({ email: candidate.email });
+
+    res.json({
+      ...candidate.toObject(),
+      submission
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

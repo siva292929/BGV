@@ -4,18 +4,22 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { 
-    type: String, 
-    enum: ['admin', 'hr', 'agent', 'candidate', 'ADMIN', 'HR', 'AGENT', 'CANDIDATE'], 
-    default: 'candidate' 
+  role: {
+    type: String,
+    enum: ['admin', 'hr', 'agent', 'candidate', 'ADMIN', 'HR', 'AGENT', 'CANDIDATE'],
+    default: 'candidate'
   },
   // ADD THIS FIELD TO FIX THE ISSUE
-  isFirstLogin: { type: Boolean, default: true }, 
-  
+  isFirstLogin: { type: Boolean, default: true },
+
   phoneNumber: { type: String },
   isPhoneVerified: { type: Boolean, default: false },
   status: { type: String, default: 'Pending' },
   assignedAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  taskCount: { type: Number, default: 0 },
+  otp: { type: String },
+  otpExpires: { type: Date },
+  bgvRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BGVRequest' }, // Link to latest request
   documents: {
     aadhar: String,
     pan: String,

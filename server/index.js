@@ -10,8 +10,10 @@ const hrRoutes = require('./routes/hr');
 const candidateRoutes = require('./routes/candidate');
 
 const app = express();
+const cookieParser = require('cookie-parser');
 app.use(express.json());
-app.use(cors());
+app.use(cookieParser());
+app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 
 // Static folder for viewing uploaded docs
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
