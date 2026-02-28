@@ -3,7 +3,8 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import HRDashboard from './pages/HRDashboard';
 import AgentDashboard from './pages/AgentDashboard';
-import CandidatePortal from './pages/CandidatePortal'; // Ensure this file is created next
+import CandidatePortal from './pages/CandidatePortal';
+import CandidateStatus from './pages/CandidateStatus';
 import ResetPassword from './pages/ResetPassword';
 import { AuthProvider } from './context/AuthContext';
 
@@ -30,6 +31,9 @@ function App() {
 
             {/* Candidate Routes: Phone OTP, Auto-Fetch, and Document Upload */}
             <Route path="/candidate-home" element={<CandidatePortal />} />
+
+            {/* Candidate Status: Check verification progress */}
+            <Route path="/candidate-status" element={<CandidateStatus />} />
 
             {/* Fallback: Redirect any unknown URL to Login */}
             <Route path="*" element={<Navigate to="/" />} />

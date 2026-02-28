@@ -1,13 +1,8 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const User = require('../models/User');
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-});
+const emailService = require('../services/emailService');
 
 router.post('/create-hr', async (req, res) => {
   try {
@@ -25,21 +20,12 @@ router.post('/create-hr', async (req, res) => {
       password: hashedPassword,
       role: role || 'HR', // Dynamic role
       empid,
-      isFirstLogin: true 
+      isFirstLogin: true
     });
 
     await newUser.save();
 
-    try {
-      await transporter.sendMail({
-        from: `"DarwinTrace Admin" <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: `Your ${role} Account Credentials`,
-        html: `<h3>Welcome ${name}</h3><p>Role: ${role}</p><p>Temp Pass: <b>${tempPassword}</b></p>`
-      });
-    } catch (mailErr) {
-      console.error("Mail failed, but account created");
-    }
+    await emailService.sendCredentialsEmail(name, email, role || 'HR', tempPassword);
 
     res.json({ message: "Account Created Successfully!", tempPassword });
   } catch (err) {
@@ -58,8 +44,8 @@ router.get('/hrs', async (req, res) => {
 });
 
 router.delete('/hr/:id', async (req, res) => {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: "Deleted" });
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ message: "Deleted" });
 });
 
 module.exports = router;

@@ -16,17 +16,15 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         payslip: String
     },
 
-    // Details manually uploaded/entered by user
+    // Candidate-entered text details
     submittedDetails: {
         isFresher: { type: Boolean, default: false },
-        aadhar: String,
-        pan: String,
-        tenth: String,
-        twelfth: String,
-        degree: String,
-        experience: String,
-        payslip: String,
-        signature: String
+        previousCompany: String,
+        previousDesignation: String,
+        previousDuration: String,
+        hrContactName: String,
+        hrContactEmail: String,
+        hrContactPhone: String
     },
 
     // File paths on server
@@ -38,6 +36,9 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         degree: String,
         experience: String,
         payslip: String,
+        releasingLetter: String,
+        addressProof: String,
+        bankStatement: String,
         signature: String
     },
 

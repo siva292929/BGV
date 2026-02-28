@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const hrRoutes = require('./routes/hr');
 const candidateRoutes = require('./routes/candidate');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 const cookieParser = require('cookie-parser');
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/hr', hrRoutes);
 app.use('/api/candidate', candidateRoutes);
+app.use('/api/chat', chatRoutes);
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ DB Connected"))

@@ -4,6 +4,7 @@ import { UserPlus, Users, ShieldCheck, Trash2, Clipboard, HardDrive, LogOut, Loa
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
+
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState({ name: '', email: '', empid: '', role: 'HR' });
@@ -105,7 +106,7 @@ const AdminDashboard = () => {
             <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">Workspace Oversight</h1>
             <p className="text-slate-500 font-medium">Manage and monitor organizational staff and verification workflows.</p>
           </div>
-          <div className="flex gap-4">
+          <div className="flex items-center gap-4">
             <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600"><Users size={24} /></div>
               <div>

@@ -49,7 +49,7 @@ const Login = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mb-6 shadow-lg shadow-indigo-500/20">
               <ShieldCheck className="text-white" size={32} />
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight mb-2">DarwinTrace</h1>
+            <h1 className="text-3xl font-bold text-white tracking-tight mb-2">BGV</h1>
             <p className="text-slate-400">Secure Background Verification</p>
           </div>
 

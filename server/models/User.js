@@ -6,20 +6,20 @@ const UserSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: {
     type: String,
-    enum: ['admin', 'hr', 'agent', 'candidate', 'ADMIN', 'HR', 'AGENT', 'CANDIDATE'],
-    default: 'candidate'
+    enum: ['ADMIN', 'HR', 'AGENT', 'CANDIDATE'],
+    default: 'CANDIDATE'
   },
-  // ADD THIS FIELD TO FIX THE ISSUE
+  empid: { type: String },
   isFirstLogin: { type: Boolean, default: true },
-
   phoneNumber: { type: String },
   isPhoneVerified: { type: Boolean, default: false },
   status: { type: String, default: 'Pending' },
   assignedAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // HR who created this candidate
   taskCount: { type: Number, default: 0 },
   otp: { type: String },
   otpExpires: { type: Date },
-  bgvRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BGVRequest' }, // Link to latest request
+  bgvRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BGVRequest' },
   documents: {
     aadhar: String,
     pan: String,
@@ -28,6 +28,9 @@ const UserSchema = new mongoose.Schema({
     tenth: String,
     experience: String,
     payslip: String,
+    releasingLetter: String,
+    addressProof: String,
+    bankStatement: String,
     signature: String
   }
 }, { timestamps: true });

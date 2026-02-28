@@ -44,7 +44,7 @@ const ResetPassword = () => {
           <div className="w-16 h-16 bg-slate-950 rounded-[32px] flex items-center justify-center text-white shadow-2xl mb-6">
             <ShieldCheck size={32} />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">DarwinTrace</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">BGV</h1>
           <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-2">Security Protocol</p>
         </div>
 

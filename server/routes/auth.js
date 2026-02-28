@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret123';
-let otpStore = {}; // Temporary in-memory OTP storage
+let otpStore = {}; // Temporary in-memory OTP storage with expiration
+const OTP_EXPIRY = 5 * 60 * 1000; // 5 minutes expiry for OTP
 
 // 1. SEND OTP
 router.post('/send-otp', async (req, res) => {
@@ -20,10 +21,15 @@ router.post('/send-otp', async (req, res) => {
     if (!user && !userId) return res.status(404).json({ error: "Mobile number not registered." });
 
     const otp = Math.floor(1000 + Math.random() * 9000); // 4-digit OTP
-    otpStore[phoneNumber] = otp;
+    // Store OTP with expiration timestamp
+    otpStore[phoneNumber] = {
+      code: otp,
+      timestamp: Date.now(),
+      attempts: 0
+    };
 
     console.log(`[SIMULATION] OTP for ${phoneNumber}: ${otp}`);
-    res.json({ message: "OTP sent successfully (Simulated)" });
+    res.json({ message: "OTP sent successfully (Simulated). Valid for 5 minutes." });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -36,7 +42,7 @@ router.post('/verify-otp', async (req, res) => {
     if (!phoneNumber) return res.status(400).json({ error: "Phone number is required" });
     phoneNumber = phoneNumber.trim();
 
-    // 1. Check if user is ALREADY verified with this number (Bypass if OTP store is empty)
+    // 1. Check if user is ALREADY verified with this number
     if (userId) {
       const currentUser = await User.findById(userId);
       if (currentUser && currentUser.isPhoneVerified && currentUser.phoneNumber === phoneNumber) {
@@ -49,33 +55,54 @@ router.post('/verify-otp', async (req, res) => {
       }
     }
 
-    if (otpStore[phoneNumber] == otp || otp === '1234') { // Allow 1234 for testing
-      // Check if this phone number is already taken by ANOTHER user
-      const existingUser = await User.findOne({ phoneNumber });
-      if (existingUser && userId && existingUser._id.toString() !== userId) {
-        return res.status(400).json({ error: "This phone number is already registered with another account." });
-      }
-
-      const query = userId ? { _id: userId } : { phoneNumber };
-      const user = await User.findOneAndUpdate(
-        query,
-        { isPhoneVerified: true, phoneNumber },
-        { new: true }
-      );
-      if (!user) return res.status(404).json({ error: "User not found" });
-
-      delete otpStore[phoneNumber];
-      setTokenCookie(res, user);
-
-      res.json({
-        role: user.role,
-        userId: user._id,
-        name: user.name,
-        isPhoneVerified: true
-      });
-    } else {
-      res.status(400).json({ error: "Invalid OTP. Please check the code and try again." });
+    // 2. Check if OTP exists and is valid
+    if (!otpStore[phoneNumber]) {
+      return res.status(400).json({ error: "OTP expired or not found. Please request a new OTP." });
     }
+
+    const otpData = otpStore[phoneNumber];
+    const isExpired = Date.now() - otpData.timestamp > OTP_EXPIRY;
+    
+    if (isExpired) {
+      delete otpStore[phoneNumber];
+      return res.status(400).json({ error: "OTP expired. Please request a new one." });
+    }
+
+    // 3. Verify OTP - STRICT verification, no testing backdoor
+    if (otpData.code != otp) {
+      otpData.attempts += 1;
+      if (otpData.attempts >= 3) {
+        delete otpStore[phoneNumber];
+        return res.status(400).json({ error: "Too many failed attempts. Please request a new OTP." });
+      }
+      return res.status(400).json({ error: "Invalid OTP. Please check the code and try again." });
+    }
+
+    // 4. OTP is valid - proceed with verification
+    // Check if this phone number is already taken by ANOTHER user
+    const existingUser = await User.findOne({ phoneNumber });
+    if (existingUser && userId && existingUser._id.toString() !== userId) {
+      return res.status(400).json({ error: "This phone number is already registered with another account." });
+    }
+
+    const query = userId ? { _id: userId } : { phoneNumber };
+    const user = await User.findOneAndUpdate(
+      query,
+      { isPhoneVerified: true, phoneNumber },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Delete OTP after successful verification - IMPORTANT for security
+    delete otpStore[phoneNumber];
+    setTokenCookie(res, user);
+
+    res.json({
+      role: user.role,
+      userId: user._id,
+      name: user.name,
+      isPhoneVerified: true
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
