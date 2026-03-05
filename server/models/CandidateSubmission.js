@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const CandidateSubmissionSchema = new mongoose.Schema({
+    uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
     email: { type: String, required: true, unique: true },
     fullName: String,
     phoneNumber: String,
@@ -13,7 +15,11 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         twelfthPercentage: String,
         degreeGPA: String,
         experience: String,
-        payslip: String
+        payslip: String,
+        previousCompany: String,
+        previousDesignation: String,
+        previousDuration: String,
+        ctc: String
     },
 
     // Candidate-entered text details
@@ -27,7 +33,7 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         hrContactPhone: String
     },
 
-    // File paths on server
+    // File URLs (Cloudinary)
     documents: {
         aadhar: String,
         pan: String,
@@ -47,8 +53,8 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         enum: ['Pending', 'Under Review', 'Verified', 'Rejected'],
         default: 'Pending'
     },
-    assignedAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    bgvRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BGVRequest' }
+    assignedAgent: { type: String },    // stores User uid
+    bgvRequest: { type: String }        // stores BGVRequest uid
 }, { timestamps: true });
 
 module.exports = mongoose.model('CandidateSubmission', CandidateSubmissionSchema);

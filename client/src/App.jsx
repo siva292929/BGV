@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Home from './pages/Home';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import HRDashboard from './pages/HRDashboard';
@@ -14,8 +15,11 @@ function App() {
       <BrowserRouter>
         <div className="min-h-screen bg-gray-50">
           <Routes>
-            {/* Public Route: Login is the entry point */}
-            <Route path="/" element={<Login />} />
+            {/* Landing Page */}
+            <Route path="/" element={<Home />} />
+
+            {/* Public Route: Login */}
+            <Route path="/login" element={<Login />} />
 
             {/* Security Route: Forced for first-time login users */}
             <Route path="/reset-password" element={<ResetPassword />} />
@@ -35,7 +39,7 @@ function App() {
             {/* Candidate Status: Check verification progress */}
             <Route path="/candidate-status" element={<CandidateStatus />} />
 
-            {/* Fallback: Redirect any unknown URL to Login */}
+            {/* Fallback: Redirect any unknown URL to Home */}
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

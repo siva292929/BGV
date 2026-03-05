@@ -19,7 +19,7 @@ const CandidateStatus = () => {
 
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const userId = user?.userId || user?._id;
+  const userId = user?.userId || user?.uid;
 
   useEffect(() => {
     if (userId) {

@@ -23,7 +23,7 @@ const HRDashboard = () => {
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const hrId = user?.userId || user?._id;
+  const hrId = user?.userId || user?.uid;
 
   useEffect(() => {
     if (hrId) fetchCandidates();
@@ -74,7 +74,7 @@ const HRDashboard = () => {
   const submitHRData = async () => {
     setHrDataLoading(true);
     try {
-      await axios.post(`http://localhost:5000/api/hr/submit-hr-data/${hrDataCandidate._id}`, hrDataForm);
+      await axios.post(`http://localhost:5000/api/hr/submit-hr-data/${hrDataCandidate.uid}`, hrDataForm);
       alert("Reference data submitted successfully! Agent can now cross-verify.");
       setShowHRDataModal(false);
       fetchCandidates();
@@ -94,12 +94,12 @@ const HRDashboard = () => {
       {/* Sidebar */}
       <aside className="w-80 bg-slate-950 p-8 flex flex-col h-screen sticky top-0">
         <div className="flex items-center gap-3 mb-12">
-          <div className="bg-blue-600 p-2.5 rounded-2xl shadow-lg shadow-blue-600/20 text-white">
-            <Briefcase size={24} />
+          <div className="bg-white p-2 rounded-2xl shadow-lg shadow-blue-400/10 border border-slate-800 transition-all hover:scale-110 hover:rotate-3 overflow-hidden">
+            <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain" />
           </div>
           <div>
-            <h2 className="text-white font-black text-lg tracking-widest uppercase">HR Portal</h2>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">BGV Management</p>
+            <h2 className="text-white font-black text-lg tracking-widest uppercase italic">BGV <span className="text-blue-500">Hub</span></h2>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">HR Operations</p>
           </div>
         </div>
 
@@ -223,7 +223,7 @@ const HRDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {candidates.map(c => (
-                    <tr key={c._id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                    <tr key={c.uid} className="group hover:bg-slate-50/50 transition-all duration-300">
                       <td className="py-6 px-4">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-white group-hover:shadow-sm">
@@ -245,7 +245,7 @@ const HRDashboard = () => {
                         </span>
                       </td>
                       <td className="py-6 px-4 text-sm text-slate-500 font-bold">
-                        {c.assignedAgent?.name || 'Unassigned'}
+                        {c.assignedAgentData?.name || 'Unassigned'}
                       </td>
                       <td className="py-6 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">

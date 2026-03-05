@@ -13,7 +13,7 @@ const ResetPassword = () => {
   const handleReset = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const userId = user?.userId || user?._id;
+    const userId = user?.userId || user?.uid;
     try {
       const res = await axios.post('http://localhost:5000/api/auth/reset-password', { userId, newPassword });
       alert("Password established successfully!");

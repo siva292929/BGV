@@ -16,7 +16,7 @@ const AgentDashboard = () => {
   const [commentDrafts, setCommentDrafts] = useState({}); // local comment state per doc
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const agentId = user?.userId || user?._id;
+  const agentId = user?.userId || user?.uid;
 
   useEffect(() => {
     if (agentId) fetchMyTasks();
@@ -25,9 +25,10 @@ const AgentDashboard = () => {
   const fetchMyTasks = async () => {
     try {
       const res = await axios.get(`http://localhost:5000/api/hr/candidates`);
-      const myIds = res.data.filter(c => c.assignedAgent?._id === agentId || c.assignedAgent === agentId).map(c => c._id);
+      const myTasks = res.data.filter(c => c.assignedAgentData?.uid === agentId || c.assignedAgent === agentId);
+      const myUids = myTasks.map(c => c.uid);
 
-      const detailPromises = myIds.map(id => axios.get(`http://localhost:5000/api/hr/candidate-progress/${id}`));
+      const detailPromises = myUids.map(uid => axios.get(`http://localhost:5000/api/hr/candidate-progress/${uid}`));
       const details = await Promise.all(detailPromises);
       setTasks(details.map(d => d.data));
     } catch (err) {
@@ -37,41 +38,43 @@ const AgentDashboard = () => {
 
   // Initialize comment drafts when a task is selected
   useEffect(() => {
-    if (selectedTask?.bgvRequest?.reviews) {
+    const reviews = selectedTask?.bgvRequestData?.reviews || selectedTask?.bgvRequest?.reviews;
+    if (reviews) {
       const drafts = {};
-      Object.entries(selectedTask.bgvRequest.reviews).forEach(([key, val]) => {
+      Object.entries(reviews).forEach(([key, val]) => {
         drafts[key] = val.comment || '';
       });
       setCommentDrafts(drafts);
     }
-  }, [selectedTask?._id]);
+  }, [selectedTask?.uid]);
 
   const handleReviewDoc = async (docType, status) => {
-    if (!selectedTask?.bgvRequest?._id) {
+    const bgvUid = selectedTask?.bgvRequestData?.uid || selectedTask?.bgvRequest?.uid;
+    if (!bgvUid) {
       alert("Verification session not initialized.");
       return;
     }
     const comment = commentDrafts[docType] || '';
     try {
       await axios.post(`http://localhost:5000/api/candidate/update-review`, {
-        candidateId: selectedTask._id,
-        requestId: selectedTask.bgvRequest._id,
+        candidateId: selectedTask.uid,
+        requestId: bgvUid,
         documentType: docType,
         status,
         comment
       });
       fetchMyTasks();
-      const updated = await axios.get(`http://localhost:5000/api/hr/candidate-progress/${selectedTask._id}`);
+      const updated = await axios.get(`http://localhost:5000/api/hr/candidate-progress/${selectedTask.uid}`);
       setSelectedTask(updated.data);
     } catch (err) {
       alert("Review failed to save");
     }
   };
 
-  const handleStatusUpdate = async (candidateId, newStatus) => {
+  const handleStatusUpdate = async (candidateUid, newStatus) => {
     try {
       await axios.patch(`http://localhost:5000/api/candidate/update-status`, {
-        candidateId,
+        candidateId: candidateUid,
         status: newStatus,
         agentId: agentId
       });
@@ -96,7 +99,8 @@ const AgentDashboard = () => {
     releasingLetter: 'Releasing Letter', addressProof: 'Address Proof', bankStatement: 'Bank Statement', signature: 'Signature'
   };
 
-  const hrData = selectedTask?.bgvRequest?.hrData;
+  const bgvReq = selectedTask?.bgvRequestData || selectedTask?.bgvRequest;
+  const hrData = bgvReq?.hrData;
   const candidateDetails = selectedTask?.submission?.submittedDetails;
 
 
@@ -105,12 +109,12 @@ const AgentDashboard = () => {
       {/* Sidebar */}
       <aside className="w-80 bg-slate-950 p-8 flex flex-col h-screen sticky top-0">
         <div className="flex items-center gap-3 mb-12">
-          <div className="bg-emerald-600 p-2.5 rounded-2xl shadow-lg shadow-emerald-600/20 text-white">
-            <ClipboardCheck size={24} />
+          <div className="bg-white p-2 rounded-2xl shadow-lg shadow-emerald-400/10 border border-slate-800 transition-all hover:scale-110 hover:rotate-3 overflow-hidden">
+            <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain" />
           </div>
           <div>
-            <h2 className="text-white font-black text-lg tracking-widest uppercase">Agent Hub</h2>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">BGV Verification</p>
+            <h2 className="text-white font-black text-lg tracking-widest uppercase italic">BGV <span className="text-emerald-500">Hub</span></h2>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.3em]">Agent Operations</p>
           </div>
         </div>
 
@@ -149,15 +153,15 @@ const AgentDashboard = () => {
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {tasks.map(task => (
               <button
-                key={task._id}
+                key={task.uid}
                 onClick={() => { setSelectedTask(task); setShowCrossVerify(false); }}
-                className={`w-full p-6 rounded-[32px] transition-all duration-300 group ${selectedTask?._id === task._id
+                className={`w-full p-6 rounded-[32px] transition-all duration-300 group ${selectedTask?.uid === task.uid
                   ? 'bg-slate-950 text-white shadow-2xl'
                   : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                   }`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${selectedTask?._id === task._id ? 'bg-white/10 text-white' : 'bg-white text-slate-400 shadow-sm'}`}>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${selectedTask?.uid === task.uid ? 'bg-white/10 text-white' : 'bg-white text-slate-400 shadow-sm'}`}>
                     <UserIcon size={20} />
                   </div>
                   <div className="text-left">
@@ -177,7 +181,7 @@ const AgentDashboard = () => {
                 <div>
                   <div className="flex items-center gap-3 mb-4 flex-wrap">
                     <span className="bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">{selectedTask.status}</span>
-                    {selectedTask.bgvRequest?.isFinalized && (
+                    {bgvReq?.isFinalized && (
                       <span className="bg-red-100 text-red-700 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest">CASE LOCKED</span>
                     )}
                     {hrData && Object.values(hrData).some(v => v) && (
@@ -197,14 +201,14 @@ const AgentDashboard = () => {
                     </button>
                   )}
                   <button
-                    onClick={() => handleStatusUpdate(selectedTask._id, 'Rejected')}
-                    disabled={selectedTask.bgvRequest?.isFinalized}
+                    onClick={() => handleStatusUpdate(selectedTask.uid, 'Rejected')}
+                    disabled={bgvReq?.isFinalized}
                     className="bg-white text-red-600 px-6 py-4 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-sm hover:bg-red-50 transition-all border border-red-100 disabled:opacity-50 disabled:cursor-not-allowed">
                     Reject
                   </button>
                   <button
-                    onClick={() => handleStatusUpdate(selectedTask._id, 'Verified')}
-                    disabled={selectedTask.bgvRequest?.isFinalized}
+                    onClick={() => handleStatusUpdate(selectedTask.uid, 'Verified')}
+                    disabled={bgvReq?.isFinalized}
                     className="bg-emerald-600 text-white px-6 py-4 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     Approve
                   </button>
@@ -272,7 +276,7 @@ const AgentDashboard = () => {
                   if (selectedTask.submission?.submittedDetails?.isFresher && ['experience', 'payslip', 'releasingLetter', 'bankStatement'].includes(doc)) return null;
 
                   const docPath = selectedTask.submission?.documents?.[doc] || selectedTask.documents?.[doc];
-                  const review = selectedTask.bgvRequest?.reviews?.[doc];
+                  const review = bgvReq?.reviews?.[doc];
                   if (!review) return null;
                   const isAutoVerified = review?.comment?.includes('Auto-verified');
 
@@ -298,7 +302,7 @@ const AgentDashboard = () => {
                       </div>
 
                       <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-                        {!isAutoVerified && !selectedTask.bgvRequest?.isFinalized ? (
+                        {!isAutoVerified && !bgvReq?.isFinalized ? (
                           <>
                             <input
                               placeholder="Add note..."
@@ -330,7 +334,7 @@ const AgentDashboard = () => {
                         )}
 
                         {docPath ? (
-                          <a href={`http://localhost:5000/${docPath}`} target="_blank" rel="noreferrer" className="p-4 bg-slate-950 text-white rounded-2xl hover:bg-emerald-600 transition-all shadow-lg">
+                          <a href={docPath} target="_blank" rel="noreferrer" className="p-4 bg-slate-950 text-white rounded-2xl hover:bg-emerald-600 transition-all shadow-lg">
                             <ExternalLink size={18} />
                           </a>
                         ) : (

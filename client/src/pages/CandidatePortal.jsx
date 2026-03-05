@@ -97,7 +97,7 @@ const CandidatePortal = () => {
 
   const navigate = useNavigate();
   const { user, logout, checkAuth } = useAuth();
-  const userId = user?.userId || user?._id;
+  const userId = user?.userId || user?.uid;
 
   useEffect(() => {
     const checkUserStatus = async () => {

@@ -15,7 +15,7 @@ router.post('/send-otp', async (req, res) => {
     phoneNumber = phoneNumber.trim();
 
     // If logged in, we can link the phone number, otherwise it must exist
-    const query = userId ? { _id: userId } : { phoneNumber };
+    const query = userId ? { uid: userId } : { phoneNumber };
     const user = await User.findOne(query);
 
     if (!user && !userId) return res.status(404).json({ error: "Mobile number not registered." });
@@ -44,11 +44,11 @@ router.post('/verify-otp', async (req, res) => {
 
     // 1. Check if user is ALREADY verified with this number
     if (userId) {
-      const currentUser = await User.findById(userId);
+      const currentUser = await User.findOne({ uid: userId });
       if (currentUser && currentUser.isPhoneVerified && currentUser.phoneNumber === phoneNumber) {
         return res.json({
           role: currentUser.role,
-          userId: currentUser._id,
+          userId: currentUser.uid,
           name: currentUser.name,
           isPhoneVerified: true
         });
@@ -62,7 +62,7 @@ router.post('/verify-otp', async (req, res) => {
 
     const otpData = otpStore[phoneNumber];
     const isExpired = Date.now() - otpData.timestamp > OTP_EXPIRY;
-    
+
     if (isExpired) {
       delete otpStore[phoneNumber];
       return res.status(400).json({ error: "OTP expired. Please request a new one." });
@@ -81,11 +81,11 @@ router.post('/verify-otp', async (req, res) => {
     // 4. OTP is valid - proceed with verification
     // Check if this phone number is already taken by ANOTHER user
     const existingUser = await User.findOne({ phoneNumber });
-    if (existingUser && userId && existingUser._id.toString() !== userId) {
+    if (existingUser && userId && existingUser.uid !== userId) {
       return res.status(400).json({ error: "This phone number is already registered with another account." });
     }
 
-    const query = userId ? { _id: userId } : { phoneNumber };
+    const query = userId ? { uid: userId } : { phoneNumber };
     const user = await User.findOneAndUpdate(
       query,
       { isPhoneVerified: true, phoneNumber },
@@ -99,7 +99,7 @@ router.post('/verify-otp', async (req, res) => {
 
     res.json({
       role: user.role,
-      userId: user._id,
+      userId: user.uid,
       name: user.name,
       isPhoneVerified: true
     });
@@ -111,7 +111,7 @@ router.post('/verify-otp', async (req, res) => {
 // Helper to set cookie
 const setTokenCookie = (res, user) => {
   const token = jwt.sign(
-    { _id: user._id, role: user.role },
+    { uid: user.uid, role: user.role },
     JWT_SECRET,
     { expiresIn: '1d' }
   );
@@ -139,7 +139,7 @@ router.post('/login', async (req, res) => {
     res.json({
       role: user.role,
       isFirstLogin: user.isFirstLogin,
-      userId: user._id,
+      userId: user.uid,
       name: user.name
     });
   } catch (err) {
@@ -159,10 +159,11 @@ router.post('/reset-password', async (req, res) => {
     const { userId, newPassword } = req.body;
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    const user = await User.findByIdAndUpdate(userId, {
-      password: hashedPassword,
-      isFirstLogin: false
-    }, { new: true });
+    const user = await User.findOneAndUpdate(
+      { uid: userId },
+      { password: hashedPassword, isFirstLogin: false },
+      { new: true }
+    );
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -171,7 +172,7 @@ router.post('/reset-password', async (req, res) => {
     res.json({
       message: "Password updated successfully!",
       role: user.role,
-      userId: user._id,
+      userId: user.uid,
       name: user.name
     });
   } catch (err) {
@@ -186,10 +187,15 @@ router.get('/me', async (req, res) => {
     if (!token) return res.status(401).json({ error: "Not authenticated" });
 
     const verified = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(verified._id).select('-password');
+    const user = await User.findOne({ uid: verified.uid }).select('-password');
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json(user);
+    // Return uid as the primary identifier, strip _id
+    const userObj = user.toObject();
+    delete userObj._id;
+    delete userObj.__v;
+    userObj.userId = user.uid;
+    res.json(userObj);
   } catch (err) {
     res.status(401).json({ error: "Invalid token" });
   }

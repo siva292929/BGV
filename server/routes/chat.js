@@ -5,31 +5,31 @@ const BGVRequest = require('../models/BGVRequest');
 
 // HELPER: Check if two users are an allowed chat pair
 // Allowed: candidate↔assigned agent, HR (creator)↔assigned agent
-const isAllowedChatPair = async (userId1, userId2) => {
-    const user1 = await User.findById(userId1).select('role assignedAgent createdBy');
-    const user2 = await User.findById(userId2).select('role assignedAgent createdBy');
+const isAllowedChatPair = async (uid1, uid2) => {
+    const user1 = await User.findOne({ uid: uid1 }).select('role assignedAgent createdBy uid');
+    const user2 = await User.findOne({ uid: uid2 }).select('role assignedAgent createdBy uid');
     if (!user1 || !user2) return false;
 
     const r1 = user1.role, r2 = user2.role;
 
     // Case 1: CANDIDATE ↔ AGENT (agent must be assigned to this candidate)
     if (r1 === 'CANDIDATE' && r2 === 'AGENT') {
-        return user1.assignedAgent && user1.assignedAgent.toString() === userId2;
+        return user1.assignedAgent && user1.assignedAgent === uid2;
     }
     if (r2 === 'CANDIDATE' && r1 === 'AGENT') {
-        return user2.assignedAgent && user2.assignedAgent.toString() === userId1;
+        return user2.assignedAgent && user2.assignedAgent === uid1;
     }
 
     // Case 2: HR ↔ AGENT (HR must have created a candidate assigned to this agent)
     if (r1 === 'HR' && r2 === 'AGENT') {
         const linkedCandidate = await User.findOne({
-            role: 'CANDIDATE', createdBy: userId1, assignedAgent: userId2
+            role: 'CANDIDATE', createdBy: uid1, assignedAgent: uid2
         });
         return !!linkedCandidate;
     }
     if (r2 === 'HR' && r1 === 'AGENT') {
         const linkedCandidate = await User.findOne({
-            role: 'CANDIDATE', createdBy: userId2, assignedAgent: userId1
+            role: 'CANDIDATE', createdBy: uid2, assignedAgent: uid1
         });
         return !!linkedCandidate;
     }
@@ -66,24 +66,31 @@ router.post('/send', async (req, res) => {
 });
 
 // GET MESSAGES BETWEEN TWO USERS (with pair validation)
-router.get('/messages/:userId1/:userId2', async (req, res) => {
+router.get('/messages/:uid1/:uid2', async (req, res) => {
     try {
-        const { userId1, userId2 } = req.params;
+        const { uid1, uid2 } = req.params;
 
-        const allowed = await isAllowedChatPair(userId1, userId2);
+        const allowed = await isAllowedChatPair(uid1, uid2);
         if (!allowed) {
             return res.status(403).json({ error: "Not authorized" });
         }
 
         const messages = await ChatMessage.find({
             $or: [
-                { sender: userId1, receiver: userId2 },
-                { sender: userId2, receiver: userId1 }
+                { sender: uid1, receiver: uid2 },
+                { sender: uid2, receiver: uid1 }
             ]
-        })
-            .sort({ createdAt: 1 })
-            .populate('sender', 'name role')
-            .populate('receiver', 'name role');
+        }).sort({ createdAt: 1 }).lean();
+
+        // Manually resolve sender/receiver names and strip _id
+        for (const msg of messages) {
+            delete msg._id;
+            delete msg.__v;
+            const senderUser = await User.findOne({ uid: msg.sender }).select('name role');
+            const receiverUser = await User.findOne({ uid: msg.receiver }).select('name role');
+            msg.senderData = senderUser ? { name: senderUser.name, role: senderUser.role } : null;
+            msg.receiverData = receiverUser ? { name: receiverUser.name, role: receiverUser.role } : null;
+        }
 
         res.json(messages);
     } catch (err) {
@@ -95,7 +102,7 @@ router.get('/messages/:userId1/:userId2', async (req, res) => {
 router.get('/contacts/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
-        const currentUser = await User.findById(userId).select('role assignedAgent createdBy');
+        const currentUser = await User.findOne({ uid: userId }).select('role assignedAgent createdBy uid');
         if (!currentUser) return res.status(404).json({ error: "User not found" });
 
         let contacts = [];
@@ -103,22 +110,22 @@ router.get('/contacts/:userId', async (req, res) => {
         if (currentUser.role === 'CANDIDATE') {
             // Candidate can only chat with their assigned agent
             if (currentUser.assignedAgent) {
-                const agent = await User.findById(currentUser.assignedAgent).select('name role email');
-                if (agent) contacts.push({ id: agent._id.toString(), name: agent.name, role: agent.role });
+                const agent = await User.findOne({ uid: currentUser.assignedAgent }).select('name role email uid');
+                if (agent) contacts.push({ id: agent.uid, name: agent.name, role: agent.role });
             }
         } else if (currentUser.role === 'AGENT') {
             // Agent can chat with: their assigned candidates + HR who created those candidates
             const assignedCandidates = await User.find({
                 role: 'CANDIDATE', assignedAgent: userId
-            }).select('name role email createdBy');
+            }).select('name role email createdBy uid');
 
             for (const cand of assignedCandidates) {
-                contacts.push({ id: cand._id.toString(), name: cand.name, role: 'CANDIDATE' });
-                // Also add the HR who created this candidate (if createdBy exists and is not the agent)
-                if (cand.createdBy && cand.createdBy.toString() !== userId) {
-                    const hr = await User.findById(cand.createdBy).select('name role email');
-                    if (hr && hr.role === 'HR' && !contacts.find(c => c.id === hr._id.toString())) {
-                        contacts.push({ id: hr._id.toString(), name: hr.name, role: 'HR' });
+                contacts.push({ id: cand.uid, name: cand.name, role: 'CANDIDATE' });
+                // Also add the HR who created this candidate
+                if (cand.createdBy && cand.createdBy !== userId) {
+                    const hr = await User.findOne({ uid: cand.createdBy }).select('name role email uid');
+                    if (hr && hr.role === 'HR' && !contacts.find(c => c.id === hr.uid)) {
+                        contacts.push({ id: hr.uid, name: hr.name, role: 'HR' });
                     }
                 }
             }
@@ -128,16 +135,16 @@ router.get('/contacts/:userId', async (req, res) => {
                 role: 'CANDIDATE', createdBy: userId
             }).select('assignedAgent');
 
-            const agentIds = [...new Set(
+            const agentUids = [...new Set(
                 createdCandidates
                     .filter(c => c.assignedAgent)
-                    .map(c => c.assignedAgent.toString())
+                    .map(c => c.assignedAgent)
             )];
 
-            for (const agentId of agentIds) {
-                if (agentId === userId) continue; // safety: skip self
-                const agent = await User.findById(agentId).select('name role email');
-                if (agent) contacts.push({ id: agent._id.toString(), name: agent.name, role: 'AGENT' });
+            for (const agentUid of agentUids) {
+                if (agentUid === userId) continue;
+                const agent = await User.findOne({ uid: agentUid }).select('name role email uid');
+                if (agent) contacts.push({ id: agent.uid, name: agent.name, role: 'AGENT' });
             }
         }
 
@@ -161,7 +168,7 @@ router.get('/conversations/:userId', async (req, res) => {
 
         const partnerMap = new Map();
         for (const msg of messages) {
-            const partnerId = msg.sender.toString() === userId ? msg.receiver.toString() : msg.sender.toString();
+            const partnerId = msg.sender === userId ? msg.receiver : msg.sender;
             if (!partnerMap.has(partnerId)) {
                 // Verify this is still an allowed pair
                 const allowed = await isAllowedChatPair(userId, partnerId);
@@ -171,18 +178,18 @@ router.get('/conversations/:userId', async (req, res) => {
                     partnerId,
                     lastMessage: msg.message,
                     lastMessageAt: msg.createdAt,
-                    unread: msg.receiver.toString() === userId && !msg.readAt ? 1 : 0
+                    unread: msg.receiver === userId && !msg.readAt ? 1 : 0
                 });
-            } else if (msg.receiver.toString() === userId && !msg.readAt) {
+            } else if (msg.receiver === userId && !msg.readAt) {
                 partnerMap.get(partnerId).unread += 1;
             }
         }
 
         const conversations = [];
         for (const [partnerId, conv] of partnerMap) {
-            const partner = await User.findById(partnerId).select('name role email');
+            const partner = await User.findOne({ uid: partnerId }).select('name role email uid');
             if (partner) {
-                conversations.push({ ...conv, partner });
+                conversations.push({ ...conv, partner: { ...partner.toObject(), id: partner.uid } });
             }
         }
 

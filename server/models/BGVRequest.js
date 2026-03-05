@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const BGVRequestSchema = new mongoose.Schema({
-    candidate: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    agent: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    hr: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
+    candidate: { type: String, required: true },  // stores User uid
+    agent: { type: String },                       // stores User uid
+    hr: { type: String },                          // stores User uid
     status: {
         type: String,
         enum: ['Pending', 'Under Review', 'Verified', 'Rejected'],
@@ -11,7 +13,7 @@ const BGVRequestSchema = new mongoose.Schema({
     },
     isFinalized: { type: Boolean, default: false },
     finalizedAt: { type: Date },
-    finalizedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    finalizedBy: { type: String },                 // stores User uid
 
     // HR-submitted reference data for cross-verification
     hrData: {

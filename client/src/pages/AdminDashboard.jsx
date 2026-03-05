@@ -45,9 +45,9 @@ const AdminDashboard = () => {
     }
   };
 
-  const deleteUser = async (id) => {
+  const deleteUser = async (uid) => {
     if (window.confirm("Delete this account permanently?")) {
-      await axios.delete(`http://localhost:5000/api/admin/hr/${id}`);
+      await axios.delete(`http://localhost:5000/api/admin/hr/${uid}`);
       fetchUsers();
     }
   };
@@ -208,7 +208,7 @@ const AdminDashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {users.map(u => (
-                    <tr key={u._id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                    <tr key={u.uid} className="group hover:bg-slate-50/50 transition-all duration-300">
                       <td className="py-6 px-4">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 font-bold group-hover:bg-white group-hover:shadow-sm">
@@ -228,7 +228,7 @@ const AdminDashboard = () => {
                       </td>
                       <td className="py-6 px-4 font-mono text-xs font-bold text-slate-500">{u.empid}</td>
                       <td className="py-6 px-4 text-right">
-                        <button onClick={() => deleteUser(u._id)} className="p-3 text-slate-200 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all">
+                        <button onClick={() => deleteUser(u.uid)} className="p-3 text-slate-200 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all">
                           <Trash2 size={18} />
                         </button>
                       </td>

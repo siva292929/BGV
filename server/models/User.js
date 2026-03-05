@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const UserSchema = new mongoose.Schema({
+  uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
@@ -14,12 +16,12 @@ const UserSchema = new mongoose.Schema({
   phoneNumber: { type: String },
   isPhoneVerified: { type: Boolean, default: false },
   status: { type: String, default: 'Pending' },
-  assignedAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // HR who created this candidate
+  assignedAgent: { type: String },   // stores agent uid
+  createdBy: { type: String },       // stores HR uid
   taskCount: { type: Number, default: 0 },
   otp: { type: String },
   otpExpires: { type: Date },
-  bgvRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BGVRequest' },
+  bgvRequest: { type: String },      // stores BGVRequest uid
   documents: {
     aadhar: String,
     pan: String,

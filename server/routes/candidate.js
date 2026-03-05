@@ -1,49 +1,37 @@
 const router = require('express').Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const User = require('../models/User');
 const MasterRecord = require('../models/MasterRecord');
 const BGVRequest = require('../models/BGVRequest');
 const CandidateSubmission = require('../models/CandidateSubmission');
 const emailService = require('../services/emailService');
-
-// Ensure the upload directory exists physically on the server
-const uploadDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// --- Multer Storage Configuration ---
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB Limit per file
-});
-
-let otpStore = {};
+const { upload, cloudinary } = require('../config/cloudinary');
 
 // --- FETCH CURRENT STATUS FOR PERSISTENCE ---
 router.get('/status/:userId', async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId)
-      .populate('assignedAgent', 'name')
-      .populate('bgvRequest');
+    const user = await User.findOne({ uid: req.params.userId }).lean();
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Resolve agent name
+    let agentName = null;
+    if (user.assignedAgent) {
+      const agent = await User.findOne({ uid: user.assignedAgent }).select('name');
+      agentName = agent ? agent.name : null;
+    }
+
+    // Resolve bgvRequest
+    let bgvRequest = null;
+    if (user.bgvRequest) {
+      bgvRequest = await BGVRequest.findOne({ uid: user.bgvRequest }).lean();
+      if (bgvRequest) { delete bgvRequest._id; delete bgvRequest.__v; }
+    }
 
     res.json({
       status: user.status,
       isPhoneVerified: user.isPhoneVerified,
       phoneNumber: user.phoneNumber,
-      assignedAgent: user.assignedAgent ? user.assignedAgent.name : null,
-      bgvRequest: user.bgvRequest
+      assignedAgent: agentName,
+      bgvRequest: bgvRequest
     });
   } catch (err) {
     res.status(500).json({ error: "Could not fetch status" });
@@ -53,14 +41,21 @@ router.get('/status/:userId', async (req, res) => {
 // --- GET DETAILED VERIFICATION STATUS WITH REVIEW DETAILS ---
 router.get('/verification-status/:userId', async (req, res) => {
   try {
-    const user = await User.findById(req.params.userId)
-      .populate('assignedAgent', 'name email')
-      .populate('bgvRequest');
-
+    const user = await User.findOne({ uid: req.params.userId }).lean();
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const bgvRequest = user.bgvRequest;
+    let bgvRequest = null;
+    if (user.bgvRequest) {
+      bgvRequest = await BGVRequest.findOne({ uid: user.bgvRequest }).lean();
+    }
     if (!bgvRequest) return res.status(404).json({ error: "No BGV request found" });
+
+    // Resolve agent
+    let assignedAgent = null;
+    if (user.assignedAgent) {
+      const agent = await User.findOne({ uid: user.assignedAgent }).select('name email uid');
+      assignedAgent = agent ? { name: agent.name, email: agent.email, uid: agent.uid } : null;
+    }
 
     // Calculate verification progress
     const reviewStates = Object.values(bgvRequest.reviews).map(r => r.status);
@@ -69,11 +64,11 @@ router.get('/verification-status/:userId', async (req, res) => {
     const rejectedDocs = reviewStates.filter(s => s === 'Rejected').length;
 
     res.json({
-      bgvRequestId: bgvRequest._id,
+      bgvRequestId: bgvRequest.uid,
       status: bgvRequest.status,
       isFinalized: bgvRequest.isFinalized,
       finalizedAt: bgvRequest.finalizedAt,
-      assignedAgent: user.assignedAgent,
+      assignedAgent: assignedAgent,
       progress: {
         verified: verifiedDocs,
         rejected: rejectedDocs,
@@ -99,14 +94,17 @@ router.get('/auto-fetch/:phoneNumber', async (req, res) => {
       return res.status(404).json({ message: "No pre-existing records found for this mobile number." });
     }
 
-    res.json(record);
+    const recordObj = record.toObject();
+    delete recordObj._id;
+    delete recordObj.__v;
+    res.json(recordObj);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 2. MULTI-CATEGORY MANUAL UPLOAD & AUTO-ASSIGNMENT
-router.post('/upload-docs', upload.fields([
+// 2. MULTI-CATEGORY MANUAL UPLOAD & AUTO-ASSIGNMENT (CLOUDINARY)
+const uploadFields = upload.fields([
   { name: 'aadhar', maxCount: 1 },
   { name: 'pan', maxCount: 1 },
   { name: 'degree', maxCount: 1 },
@@ -118,7 +116,17 @@ router.post('/upload-docs', upload.fields([
   { name: 'addressProof', maxCount: 1 },
   { name: 'bankStatement', maxCount: 1 },
   { name: 'signature', maxCount: 1 }
-]), async (req, res) => {
+]);
+
+router.post('/upload-docs', (req, res, next) => {
+  uploadFields(req, res, (err) => {
+    if (err) {
+      console.error('❌ Multer/Cloudinary upload error:', err);
+      return res.status(500).json({ error: `File upload failed: ${err.message || err}` });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { userId, isFresher, previousCompany, previousDesignation, previousDuration,
       hrContactName, hrContactEmail, hrContactPhone, ...extraDetails } = req.body;
@@ -126,19 +134,20 @@ router.post('/upload-docs', upload.fields([
 
     if (!userId) return res.status(400).json({ error: "User ID missing" });
 
-    const user = await User.findById(userId);
+    const user = await User.findOne({ uid: userId });
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    // Build Cloudinary URLs from uploaded files
     const docPaths = {};
     Object.keys(files).forEach(key => {
-      docPaths[key] = `uploads/${files[key][0].filename}`;
+      // multer-storage-cloudinary puts the URL in file.path
+      docPaths[key] = files[key][0].path;
     });
 
     // --- AUTO-ASSIGNMENT LOGIC: Least taskCount ---
     const bestAgent = await User.findOne({ role: 'AGENT' }).sort({ taskCount: 1 });
 
     // --- AUTO-VERIFICATION LOGIC ---
-    // Fetch MasterRecord if phone exists
     const trimmedPhone = user.phoneNumber ? user.phoneNumber.trim() : null;
     const masterRecord = trimmedPhone ? await MasterRecord.findOne({ phoneNumber: trimmedPhone }) : null;
 
@@ -165,7 +174,7 @@ router.post('/upload-docs', upload.fields([
     // 1. Create BGVRequest Record
     const newBGVRequest = new BGVRequest({
       candidate: userId,
-      agent: bestAgent ? bestAgent._id : null,
+      agent: bestAgent ? bestAgent.uid : null,
       hr: user.createdBy || null,
       status: 'Under Review',
       reviews: reviews
@@ -183,8 +192,10 @@ router.post('/upload-docs', upload.fields([
         tenthPercentage: masterRecord.tenthPercentage,
         twelfthPercentage: masterRecord.twelfthPercentage,
         degreeGPA: masterRecord.degreeGPA,
-        experience: masterRecord.experience,
-        payslip: masterRecord.payslip
+        previousCompany: masterRecord.previousCompany,
+        previousDesignation: masterRecord.previousDesignation,
+        previousDuration: masterRecord.previousDuration,
+        ctc: masterRecord.ctc
       } : {},
       submittedDetails: {
         isFresher: isFresher === 'true',
@@ -197,8 +208,8 @@ router.post('/upload-docs', upload.fields([
       },
       documents: docPaths,
       status: 'Under Review',
-      assignedAgent: bestAgent ? bestAgent._id : null,
-      bgvRequest: newBGVRequest._id
+      assignedAgent: bestAgent ? bestAgent.uid : null,
+      bgvRequest: newBGVRequest.uid
     };
 
     await CandidateSubmission.findOneAndUpdate(
@@ -210,21 +221,21 @@ router.post('/upload-docs', upload.fields([
     const updateData = {
       documents: docPaths,
       status: 'Under Review',
-      bgvRequest: newBGVRequest._id
+      bgvRequest: newBGVRequest.uid
     };
 
     if (bestAgent) {
-      updateData.assignedAgent = bestAgent._id;
-      await User.findByIdAndUpdate(bestAgent._id, { $inc: { taskCount: 1 } });
+      updateData.assignedAgent = bestAgent.uid;
+      await User.findOneAndUpdate({ uid: bestAgent.uid }, { $inc: { taskCount: 1 } });
     }
 
-    await User.findByIdAndUpdate(userId, updateData);
+    await User.findOneAndUpdate({ uid: userId }, updateData);
 
     res.json({
       success: true,
       message: bestAgent ? `Documents uploaded and assigned to Agent ${bestAgent.name}` : "Documents uploaded successfully",
       assignedAgent: bestAgent ? bestAgent.name : null,
-      requestId: newBGVRequest._id
+      requestId: newBGVRequest.uid
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -236,7 +247,7 @@ router.post('/update-review', async (req, res) => {
   try {
     const { candidateId, requestId, documentType, status, comment } = req.body;
 
-    const request = await BGVRequest.findById(requestId);
+    const request = await BGVRequest.findOne({ uid: requestId });
     if (!request) return res.status(404).json({ error: "Request not found" });
 
     // Prevent changes if already finalized
@@ -269,11 +280,14 @@ router.post('/update-review', async (req, res) => {
     await request.save();
 
     // Sync status back to User model
-    await User.findByIdAndUpdate(candidateId, { status: request.status });
+    const candidate = await User.findOne({ uid: candidateId });
+    if (candidate) {
+      candidate.status = request.status;
+      await candidate.save();
+    }
 
     // 📧 SEND EMAIL ALERT: Only when status CHANGES to Rejected (not on duplicate calls)
     if (status === 'Rejected' && previousStatus !== 'Rejected') {
-      const candidate = await User.findById(candidateId);
       if (candidate) {
         await emailService.sendReuploadEmail(candidate.email, candidate.name, documentType, comment);
       }
@@ -292,11 +306,14 @@ router.patch('/update-status', async (req, res) => {
     return res.status(400).json({ error: "Invalid status" });
   }
   try {
-    await User.findByIdAndUpdate(candidateId, { status });
+    const user = await User.findOne({ uid: candidateId });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const user = await User.findById(candidateId);
+    user.status = status;
+    await user.save();
+
     if (user.bgvRequest) {
-      const bgvRequest = await BGVRequest.findById(user.bgvRequest);
+      const bgvRequest = await BGVRequest.findOne({ uid: user.bgvRequest });
       if (bgvRequest) {
         if (status === 'Verified' || status === 'Rejected') {
           bgvRequest.isFinalized = true;
@@ -321,7 +338,7 @@ router.patch('/update-status', async (req, res) => {
   }
 });
 
-// 5. CANDIDATE RE-UPLOAD REJECTED DOCUMENT
+// 5. CANDIDATE RE-UPLOAD REJECTED DOCUMENT (CLOUDINARY)
 router.post('/re-upload-document', upload.single('document'), async (req, res) => {
   try {
     const { candidateId, documentType, bgvRequestId } = req.body;
@@ -330,37 +347,38 @@ router.post('/re-upload-document', upload.single('document'), async (req, res) =
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const candidate = await User.findById(candidateId);
+    const candidate = await User.findOne({ uid: candidateId });
     if (!candidate) {
-      fs.unlinkSync(req.file.path);
       return res.status(404).json({ error: "Candidate not found" });
     }
 
-    // 1. Update CandidateSubmission
-    let submission = await CandidateSubmission.findOne({
-      $or: [{ candidateId: candidateId }, { email: candidate.email }]
-    });
+    // The new Cloudinary URL
+    const cloudinaryUrl = req.file.path;
 
-    const relativePath = `uploads/${req.file.filename}`;
+    // 1. Update CandidateSubmission
+    let submission = await CandidateSubmission.findOne({ email: candidate.email });
 
     if (submission) {
       if (!submission.documents) submission.documents = {};
 
-      const oldPath = submission.documents[documentType];
-      if (oldPath) {
-        const fullOldPath = path.join(__dirname, '..', oldPath);
-        if (fs.existsSync(fullOldPath)) {
-          fs.unlinkSync(fullOldPath);
+      // Delete old file from Cloudinary if it exists
+      const oldUrl = submission.documents[documentType];
+      if (oldUrl && oldUrl.includes('cloudinary')) {
+        try {
+          const publicId = oldUrl.split('/').slice(-2).join('/').split('.')[0];
+          await cloudinary.uploader.destroy(publicId);
+        } catch (e) {
+          console.log('Could not delete old Cloudinary file:', e.message);
         }
       }
 
-      submission.documents[documentType] = relativePath;
+      submission.documents[documentType] = cloudinaryUrl;
       submission.status = 'Under Review';
       await submission.save();
     }
 
     // 2. Update BGVRequest
-    const bgvRequest = await BGVRequest.findById(bgvRequestId);
+    const bgvRequest = await BGVRequest.findOne({ uid: bgvRequestId });
     if (bgvRequest) {
       if (bgvRequest.reviews[documentType]) {
         bgvRequest.reviews[documentType].status = 'Pending';
@@ -372,14 +390,12 @@ router.post('/re-upload-document', upload.single('document'), async (req, res) =
     }
 
     // 3. Update User status
-    await User.findByIdAndUpdate(candidateId, { status: 'Under Review' });
+    candidate.status = 'Under Review';
+    await candidate.save();
 
     res.json({ success: true, message: `${documentType} re-uploaded successfully. Awaiting review.` });
   } catch (err) {
     console.error('❌ Re-upload error:', err);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
     res.status(500).json({ error: "Failed to re-upload document" });
   }
 });

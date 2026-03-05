@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Loader2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Lock, Mail, Loader2, ArrowRight, ShieldCheck, Fingerprint } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -38,63 +38,112 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/20 rounded-full blur-[120px]"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/20 rounded-full blur-[120px]"></div>
+    <div className="min-h-screen bg-white flex items-center justify-center p-6 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      {/* Dynamic Background Blobs (Matches Home) */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-indigo-50 animate-[pulse_10s_infinite] rounded-full blur-[160px] opacity-60"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-purple-50 animate-[pulse_8s_infinite] rounded-full blur-[160px] opacity-60"></div>
 
-      <div className="w-full max-w-[440px] z-10">
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-[32px] p-8 md:p-10 shadow-2xl">
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl mb-6 shadow-lg shadow-indigo-500/20">
-              <ShieldCheck className="text-white" size={32} />
+      {/* Background Grid */}
+      <div className="fixed inset-0 z-[-1] opacity-[0.03] pointer-events-none"
+        style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+
+      <div className="w-full max-w-[480px] relative animate-[fadeInUp_0.8s_ease-out]">
+        {/* Back to Home Button */}
+        <button
+          onClick={() => navigate('/')}
+          className="absolute -top-16 left-0 flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-indigo-600 transition-colors group"
+        >
+          <ArrowRight size={14} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
+          Back to Home
+        </button>
+
+        <div className="bg-white/40 backdrop-blur-3xl border border-white rounded-[48px] p-10 md:p-14 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.05)] border-b-8 border-slate-100 relative">
+
+          {/* Logo Integration */}
+          <div className="flex flex-col items-center text-center mb-12">
+            <div className="w-24 h-24 bg-white rounded-[32px] flex items-center justify-center shadow-2xl shadow-indigo-200/50 mb-8 border border-slate-50 relative group cursor-pointer" onClick={() => navigate('/')}>
+              <div className="absolute inset-0 bg-indigo-50 rounded-[32px] scale-0 group-hover:scale-100 transition-transform duration-500 -z-10"></div>
+              <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain group-hover:scale-110 transition-transform duration-500" />
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight mb-2">BGV</h1>
-            <p className="text-slate-400">Secure Background Verification</p>
+            <h1 className="text-4xl font-[1000] text-slate-900 tracking-[-0.04em] uppercase mb-2">BGV <span className="text-indigo-600">Portal</span></h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Integrated Verification Engine</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
+          <form onSubmit={handleLogin} className="space-y-8">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Work Email</label>
               <div className="relative group">
-                <Mail className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                <Mail className="absolute left-5 top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={20} />
                 <input
                   type="email"
-                  placeholder="name@company.com"
-                  className="w-full bg-white/5 border border-white/10 text-white p-3.5 pl-12 rounded-2xl focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-600"
+                  placeholder="name@organization.com"
+                  className="w-full bg-white border-2 border-slate-50 text-slate-900 p-5 pl-14 rounded-[24px] focus:border-indigo-500/20 focus:ring-8 focus:ring-indigo-500/5 outline-none transition-all font-bold placeholder:text-slate-200 placeholder:font-black placeholder:uppercase placeholder:text-[10px] placeholder:tracking-widest"
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center ml-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Access Key</label>
+                <a href="#" className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline decoration-2 underline-offset-4">Forgot?</a>
+              </div>
               <div className="relative group">
-                <Lock className="absolute left-4 top-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                <Lock className="absolute left-5 top-5 text-slate-300 group-focus-within:text-indigo-500 transition-colors" size={20} />
                 <input
                   type="password"
                   placeholder="••••••••"
-                  className="w-full bg-white/5 border border-white/10 text-white p-3.5 pl-12 rounded-2xl focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-600"
+                  className="w-full bg-white border-2 border-slate-50 text-slate-900 p-5 pl-14 rounded-[24px] focus:border-indigo-500/20 focus:ring-8 focus:ring-indigo-500/5 outline-none transition-all font-bold placeholder:text-slate-200"
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
               </div>
             </div>
+
             <button
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white p-4 rounded-2xl font-bold transition-all shadow-lg shadow-indigo-600/20 flex justify-center items-center gap-2 mt-4 hover:translate-y-[-2px] active:translate-y-[0px]"
+              className="group relative w-full bg-slate-950 text-white p-6 rounded-[24px] font-black text-[12px] uppercase tracking-[0.3em] transition-all shadow-2xl shadow-slate-200 hover:shadow-indigo-500/20 active:scale-95 disabled:opacity-50 overflow-hidden"
             >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : (
-                <>Sign In <ArrowRight size={18} /></>
-              )}
+              <span className="relative z-10 flex items-center justify-center gap-3">
+                {loading ? <Loader2 className="animate-spin" size={20} /> : (
+                  <>Establish Session <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></>
+                )}
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             </button>
           </form>
+
+          {/* Social / Info Footer */}
+          <div className="mt-12 pt-8 border-t border-slate-50 flex flex-col items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex -space-x-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center">
+                    <ShieldCheck size={14} className="text-slate-400" />
+                  </div>
+                ))}
+              </div>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                Trusted by <span className="text-slate-900">Global Security</span> Partners
+              </p>
+            </div>
+          </div>
         </div>
 
-        <p className="text-center mt-8 text-slate-500 text-sm">
-          Protected by Enterprise-grade Encryption
-        </p>
+        <div className="mt-12 flex items-center justify-center gap-8 text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
+          <span className="flex items-center gap-2"><Fingerprint size={12} /> Biometric Ready</span>
+          <span className="flex items-center gap-2"><ShieldCheck size={12} /> AES-256 Cloud</span>
+        </div>
       </div>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}} />
     </div>
   );
 };

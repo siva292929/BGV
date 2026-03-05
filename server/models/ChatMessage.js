@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const ChatMessageSchema = new mongoose.Schema({
-    sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    receiver: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    bgvRequest: { type: mongoose.Schema.Types.ObjectId, ref: 'BGVRequest' },
+    uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
+    sender: { type: String, required: true },     // stores User uid
+    receiver: { type: String, required: true },   // stores User uid
+    bgvRequest: { type: String },                 // stores BGVRequest uid
     message: { type: String, required: true },
     readAt: { type: Date, default: null }
 }, { timestamps: true });

@@ -82,9 +82,9 @@ const ChatView = ({ currentUserId, partnerId, partnerName, partnerRole, onBack }
                     </div>
                 )}
                 {messages.map((msg, i) => {
-                    const isMine = (msg.sender?._id || msg.sender) === currentUserId;
+                    const isMine = msg.sender === currentUserId;
                     return (
-                        <div key={msg._id || i} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                        <div key={msg.uid || i} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm ${isMine
                                 ? 'bg-indigo-600 text-white rounded-br-lg'
                                 : 'bg-white text-slate-800 border border-slate-200 rounded-bl-lg shadow-sm'
