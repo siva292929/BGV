@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { STATUS } = require('../constants');
 
 const CandidateSubmissionSchema = new mongoose.Schema({
     uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
@@ -7,7 +8,6 @@ const CandidateSubmissionSchema = new mongoose.Schema({
     fullName: String,
     phoneNumber: String,
 
-    // Autofetched data from MasterRecords
     autofetchedDetails: {
         aadharNumber: String,
         panNumber: String,
@@ -22,7 +22,6 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         ctc: String
     },
 
-    // Candidate-entered text details
     submittedDetails: {
         isFresher: { type: Boolean, default: false },
         previousCompany: String,
@@ -33,7 +32,6 @@ const CandidateSubmissionSchema = new mongoose.Schema({
         hrContactPhone: String
     },
 
-    // File URLs (Cloudinary)
     documents: {
         aadhar: String,
         pan: String,
@@ -49,12 +47,12 @@ const CandidateSubmissionSchema = new mongoose.Schema({
     },
 
     status: {
-        type: String,
-        enum: ['Pending', 'Under Review', 'Verified', 'Rejected'],
-        default: 'Pending'
+        type: Number,
+        enum: [STATUS.PENDING, STATUS.UNDER_REVIEW, STATUS.VERIFIED, STATUS.REJECTED],
+        default: STATUS.PENDING
     },
-    assignedAgent: { type: String },    // stores User uid
-    bgvRequest: { type: String }        // stores BGVRequest uid
+    assignedAgent: { type: String },
+    bgvRequest: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('CandidateSubmission', CandidateSubmissionSchema);

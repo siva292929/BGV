@@ -5,6 +5,7 @@ const User = require('../models/User');
 const BGVRequest = require('../models/BGVRequest');
 const CandidateSubmission = require('../models/CandidateSubmission');
 const emailService = require('../services/emailService');
+const { ROLES } = require('../constants');
 
 // CREATE CANDIDATE (with createdBy tracking)
 router.post('/create-candidate', async (req, res) => {
@@ -14,7 +15,7 @@ router.post('/create-candidate', async (req, res) => {
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ error: "Email already exists" });
 
-    const bestAgent = await User.findOne({ role: 'AGENT' }).sort({ taskCount: 1 });
+    const bestAgent = await User.findOne({ role: ROLES.AGENT }).sort({ taskCount: 1 });
 
     const tempPassword = crypto.randomBytes(4).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
@@ -23,7 +24,7 @@ router.post('/create-candidate', async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role: 'CANDIDATE',
+      role: ROLES.CANDIDATE,
       assignedAgent: bestAgent ? bestAgent.uid : null,
       createdBy: hrId || null,
       isFirstLogin: true
@@ -58,7 +59,7 @@ const stripIds = (obj) => {
 router.get('/candidates', async (req, res) => {
   try {
     const { hrId } = req.query;
-    const filter = { role: 'CANDIDATE' };
+    const filter = { role: ROLES.CANDIDATE };
     if (hrId) {
       filter.createdBy = hrId;
     }

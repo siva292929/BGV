@@ -6,6 +6,7 @@ import {
   MapPin, Shield, LogOut, ChevronLeft, ChevronRight, FileCheck, Loader2, PenTool, FileText, ArrowRight, Info, ExternalLink, Smartphone, Building, Mail
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { STATUS } from '../constants';
 
 const HybridField = ({ label, dbValue, fileKey, subLabel, files, setFiles, autoLabel, required }) => (
   <div className={`p-6 rounded-[32px] border-2 transition-all duration-500 group ${dbValue ? 'bg-indigo-50/30 border-indigo-100' : 'bg-slate-50 border-slate-100 hover:border-indigo-200'
@@ -587,7 +588,7 @@ const CandidatePortal = () => {
               {/* SUCCESS / FINAL STATUS STAGE */}
               {currentStep === 6 && (
                 <div className="text-center py-20 px-8 space-y-12 animate-in zoom-in-95 duration-1000">
-                  {candidateStatus === 'Verified' ? (
+                  {candidateStatus === STATUS.VERIFIED ? (
                     <>
                       <div className="relative inline-block">
                         <div className="absolute inset-0 bg-green-500 blur-3xl opacity-20 animate-pulse"></div>
@@ -605,7 +606,7 @@ const CandidatePortal = () => {
                         </div>
                       </div>
                     </>
-                  ) : candidateStatus === 'Rejected' ? (
+                  ) : candidateStatus === STATUS.REJECTED ? (
                     <>
                       <div className="relative inline-block">
                         <div className="absolute inset-0 bg-red-500 blur-3xl opacity-20 animate-pulse"></div>

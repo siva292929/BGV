@@ -30,11 +30,11 @@ const Login = () => {
   };
 
   const redirectByRole = (role) => {
-    const userRole = role.toUpperCase();
-    if (userRole === 'ADMIN') navigate('/admin-dashboard');
-    else if (userRole === 'HR') navigate('/dashboard');
-    else if (userRole === 'AGENT') navigate('/agent-dashboard');
-    else navigate('/candidate-home');
+    const r = Number(role);
+    if (r === 0) navigate('/admin-dashboard');       // ADMIN
+    else if (r === 1) navigate('/dashboard');         // HR
+    else if (r === 2) navigate('/agent-dashboard');   // AGENT
+    else navigate('/candidate-home');                 // CANDIDATE
   };
 
   return (

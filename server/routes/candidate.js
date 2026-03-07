@@ -5,6 +5,7 @@ const BGVRequest = require('../models/BGVRequest');
 const CandidateSubmission = require('../models/CandidateSubmission');
 const emailService = require('../services/emailService');
 const { upload, cloudinary } = require('../config/cloudinary');
+const { ROLES, STATUS, STATUS_LABELS, REVIEW } = require('../constants');
 
 // --- FETCH CURRENT STATUS FOR PERSISTENCE ---
 router.get('/status/:userId', async (req, res) => {
@@ -60,8 +61,8 @@ router.get('/verification-status/:userId', async (req, res) => {
     // Calculate verification progress
     const reviewStates = Object.values(bgvRequest.reviews).map(r => r.status);
     const totalDocs = reviewStates.length;
-    const verifiedDocs = reviewStates.filter(s => s === 'Verified').length;
-    const rejectedDocs = reviewStates.filter(s => s === 'Rejected').length;
+    const verifiedDocs = reviewStates.filter(s => s === REVIEW.VERIFIED).length;
+    const rejectedDocs = reviewStates.filter(s => s === REVIEW.REJECTED).length;
 
     res.json({
       bgvRequestId: bgvRequest.uid,
@@ -140,35 +141,34 @@ router.post('/upload-docs', (req, res, next) => {
     // Build Cloudinary URLs from uploaded files
     const docPaths = {};
     Object.keys(files).forEach(key => {
-      // multer-storage-cloudinary puts the URL in file.path
       docPaths[key] = files[key][0].path;
     });
 
     // --- AUTO-ASSIGNMENT LOGIC: Least taskCount ---
-    const bestAgent = await User.findOne({ role: 'AGENT' }).sort({ taskCount: 1 });
+    const bestAgent = await User.findOne({ role: ROLES.AGENT }).sort({ taskCount: 1 });
 
     // --- AUTO-VERIFICATION LOGIC ---
     const trimmedPhone = user.phoneNumber ? user.phoneNumber.trim() : null;
     const masterRecord = trimmedPhone ? await MasterRecord.findOne({ phoneNumber: trimmedPhone }) : null;
 
     const reviews = {
-      aadhar: { status: 'Pending' },
-      pan: { status: 'Pending' },
-      degree: { status: 'Pending' },
-      twelfth: { status: 'Pending' },
-      tenth: { status: 'Pending' },
-      experience: { status: 'Pending' },
-      payslip: { status: 'Pending' },
-      releasingLetter: { status: 'Pending' },
-      addressProof: { status: 'Pending' },
-      bankStatement: { status: 'Pending' },
-      signature: { status: 'Pending' }
+      aadhar: { status: REVIEW.PENDING },
+      pan: { status: REVIEW.PENDING },
+      degree: { status: REVIEW.PENDING },
+      twelfth: { status: REVIEW.PENDING },
+      tenth: { status: REVIEW.PENDING },
+      experience: { status: REVIEW.PENDING },
+      payslip: { status: REVIEW.PENDING },
+      releasingLetter: { status: REVIEW.PENDING },
+      addressProof: { status: REVIEW.PENDING },
+      bankStatement: { status: REVIEW.PENDING },
+      signature: { status: REVIEW.PENDING }
     };
 
     // ONLY auto-verify Aadhaar and PAN from MasterRecord
     if (masterRecord) {
-      if (masterRecord.aadharNumber) reviews.aadhar = { status: 'Verified', comment: 'Auto-verified from Master Database' };
-      if (masterRecord.panNumber) reviews.pan = { status: 'Verified', comment: 'Auto-verified from Master Database' };
+      if (masterRecord.aadharNumber) reviews.aadhar = { status: REVIEW.VERIFIED, comment: 'Auto-verified from Master Database' };
+      if (masterRecord.panNumber) reviews.pan = { status: REVIEW.VERIFIED, comment: 'Auto-verified from Master Database' };
     }
 
     // 1. Create BGVRequest Record
@@ -176,7 +176,7 @@ router.post('/upload-docs', (req, res, next) => {
       candidate: userId,
       agent: bestAgent ? bestAgent.uid : null,
       hr: user.createdBy || null,
-      status: 'Under Review',
+      status: STATUS.UNDER_REVIEW,
       reviews: reviews
     });
     await newBGVRequest.save();
@@ -207,7 +207,7 @@ router.post('/upload-docs', (req, res, next) => {
         hrContactPhone: hrContactPhone || ''
       },
       documents: docPaths,
-      status: 'Under Review',
+      status: STATUS.UNDER_REVIEW,
       assignedAgent: bestAgent ? bestAgent.uid : null,
       bgvRequest: newBGVRequest.uid
     };
@@ -220,7 +220,7 @@ router.post('/upload-docs', (req, res, next) => {
 
     const updateData = {
       documents: docPaths,
-      status: 'Under Review',
+      status: STATUS.UNDER_REVIEW,
       bgvRequest: newBGVRequest.uid
     };
 
@@ -271,10 +271,10 @@ router.post('/update-review', async (req, res) => {
 
     // Check if all documents are verified
     const reviewStates = Object.values(request.reviews).map(r => r.status);
-    if (reviewStates.every(s => s === 'Verified')) {
-      request.status = 'Verified';
+    if (reviewStates.every(s => s === REVIEW.VERIFIED)) {
+      request.status = STATUS.VERIFIED;
     } else {
-      request.status = 'Under Review';
+      request.status = STATUS.UNDER_REVIEW;
     }
 
     await request.save();
@@ -286,8 +286,8 @@ router.post('/update-review', async (req, res) => {
       await candidate.save();
     }
 
-    // 📧 SEND EMAIL ALERT: Only when status CHANGES to Rejected (not on duplicate calls)
-    if (status === 'Rejected' && previousStatus !== 'Rejected') {
+    // 📧 SEND EMAIL ALERT: Only when status CHANGES to Rejected
+    if (status === REVIEW.REJECTED && previousStatus !== REVIEW.REJECTED) {
       if (candidate) {
         await emailService.sendReuploadEmail(candidate.email, candidate.name, documentType, comment);
       }
@@ -302,7 +302,7 @@ router.post('/update-review', async (req, res) => {
 // 4. AGENT FINAL STATUS UPDATE - Locks case after submission
 router.patch('/update-status', async (req, res) => {
   const { candidateId, status, agentId } = req.body;
-  if (!['Verified', 'Rejected', 'Under Review'].includes(status)) {
+  if (![STATUS.VERIFIED, STATUS.REJECTED, STATUS.UNDER_REVIEW].includes(status)) {
     return res.status(400).json({ error: "Invalid status" });
   }
   try {
@@ -315,7 +315,7 @@ router.patch('/update-status', async (req, res) => {
     if (user.bgvRequest) {
       const bgvRequest = await BGVRequest.findOne({ uid: user.bgvRequest });
       if (bgvRequest) {
-        if (status === 'Verified' || status === 'Rejected') {
+        if (status === STATUS.VERIFIED || status === STATUS.REJECTED) {
           bgvRequest.isFinalized = true;
           bgvRequest.finalizedAt = Date.now();
           bgvRequest.finalizedBy = agentId;
@@ -326,13 +326,13 @@ router.patch('/update-status', async (req, res) => {
     }
 
     // 📧 Send final case email to candidate
-    if (status === 'Verified') {
+    if (status === STATUS.VERIFIED) {
       await emailService.sendCaseApprovedEmail(user.email, user.name);
-    } else if (status === 'Rejected') {
+    } else if (status === STATUS.REJECTED) {
       await emailService.sendCaseRejectedEmail(user.email, user.name);
     }
 
-    res.json({ success: true, message: `Candidate ${status} successfully. Case locked.` });
+    res.json({ success: true, message: `Candidate ${STATUS_LABELS[status]} successfully. Case locked.` });
   } catch (err) {
     res.status(500).json({ error: "Failed to update status" });
   }
@@ -373,7 +373,7 @@ router.post('/re-upload-document', upload.single('document'), async (req, res) =
       }
 
       submission.documents[documentType] = cloudinaryUrl;
-      submission.status = 'Under Review';
+      submission.status = STATUS.UNDER_REVIEW;
       await submission.save();
     }
 
@@ -381,16 +381,16 @@ router.post('/re-upload-document', upload.single('document'), async (req, res) =
     const bgvRequest = await BGVRequest.findOne({ uid: bgvRequestId });
     if (bgvRequest) {
       if (bgvRequest.reviews[documentType]) {
-        bgvRequest.reviews[documentType].status = 'Pending';
+        bgvRequest.reviews[documentType].status = REVIEW.PENDING;
         bgvRequest.reviews[documentType].comment = 'Re-uploaded';
       }
-      bgvRequest.status = 'Under Review';
+      bgvRequest.status = STATUS.UNDER_REVIEW;
       bgvRequest.isFinalized = false; // Unlock case for re-review
       await bgvRequest.save();
     }
 
     // 3. Update User status
-    candidate.status = 'Under Review';
+    candidate.status = STATUS.UNDER_REVIEW;
     await candidate.save();
 
     res.json({ success: true, message: `${documentType} re-uploaded successfully. Awaiting review.` });

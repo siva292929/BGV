@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ChatHub from '../components/ChatPanel';
+import { ROLES, STATUS, STATUS_LABELS, REVIEW, REVIEW_LABELS } from '../constants';
 
 const AgentDashboard = () => {
   const [tasks, setTasks] = useState([]);
@@ -78,7 +79,7 @@ const AgentDashboard = () => {
         status: newStatus,
         agentId: agentId
       });
-      alert(`Case marked as ${newStatus}. Case is now locked.`);
+      alert(`Case marked as ${STATUS_LABELS[newStatus]}. Case is now locked.`);
       setSelectedTask(null);
       fetchMyTasks();
     } catch (err) {
@@ -201,13 +202,13 @@ const AgentDashboard = () => {
                     </button>
                   )}
                   <button
-                    onClick={() => handleStatusUpdate(selectedTask.uid, 'Rejected')}
+                    onClick={() => handleStatusUpdate(selectedTask.uid, STATUS.REJECTED)}
                     disabled={bgvReq?.isFinalized}
                     className="bg-white text-red-600 px-6 py-4 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-sm hover:bg-red-50 transition-all border border-red-100 disabled:opacity-50 disabled:cursor-not-allowed">
                     Reject
                   </button>
                   <button
-                    onClick={() => handleStatusUpdate(selectedTask.uid, 'Verified')}
+                    onClick={() => handleStatusUpdate(selectedTask.uid, STATUS.VERIFIED)}
                     disabled={bgvReq?.isFinalized}
                     className="bg-emerald-600 text-white px-6 py-4 rounded-[24px] font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                     Approve
@@ -291,9 +292,9 @@ const AgentDashboard = () => {
                         <div className="text-left">
                           <p className="text-lg font-black text-slate-900 uppercase tracking-tight">{docLabels[doc] || doc}</p>
                           <div className="flex items-center gap-2">
-                            <p className={`text-[10px] font-black uppercase tracking-widest ${review?.status === 'Verified' ? 'text-emerald-600' :
-                              review?.status === 'Rejected' ? 'text-red-600' : 'text-slate-400'
-                              }`}>{review?.status}</p>
+                            <p className={`text-[10px] font-black uppercase tracking-widest ${review?.status === REVIEW.VERIFIED ? 'text-emerald-600' :
+                              review?.status === REVIEW.REJECTED ? 'text-red-600' : 'text-slate-400'
+                              }`}>{REVIEW_LABELS[review?.status] || 'Pending'}</p>
                             {isAutoVerified && (
                               <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">Auto-Verified</span>
                             )}
@@ -312,13 +313,13 @@ const AgentDashboard = () => {
                             />
                             <div className="flex gap-2">
                               <button
-                                onClick={() => handleReviewDoc(doc, 'Verified')}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === 'Verified' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}>
+                                onClick={() => handleReviewDoc(doc, REVIEW.VERIFIED)}
+                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === REVIEW.VERIFIED ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}>
                                 Verify
                               </button>
                               <button
-                                onClick={() => handleReviewDoc(doc, 'Rejected')}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === 'Rejected' ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'}`}>
+                                onClick={() => handleReviewDoc(doc, REVIEW.REJECTED)}
+                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === REVIEW.REJECTED ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'}`}>
                                 Flag
                               </button>
                             </div>
@@ -359,7 +360,7 @@ const AgentDashboard = () => {
       </main>
 
       {/* Chat Hub */}
-      <ChatHub currentUserId={agentId} />
+      <ChatHub currentUserId={agentId} currentUserRole={ROLES.AGENT} />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { UserPlus, UserCheck, Clock, Mail, LogOut, Loader2, ArrowRight, User as UserIcon, ShieldCheck, Briefcase, MessageCircle, FileText, Building } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { STATUS, STATUS_LABELS, ROLES } from '../constants';
 import ChatHub from '../components/ChatPanel';
 
 const HRDashboard = () => {
@@ -85,9 +86,9 @@ const HRDashboard = () => {
     }
   };
 
-  const pendingCount = candidates.filter(c => c.status === 'Pending').length;
-  const reviewCount = candidates.filter(c => c.status === 'Under Review').length;
-  const verifiedCount = candidates.filter(c => c.status === 'Verified').length;
+  const pendingCount = candidates.filter(c => c.status === STATUS.PENDING).length;
+  const reviewCount = candidates.filter(c => c.status === STATUS.UNDER_REVIEW).length;
+  const verifiedCount = candidates.filter(c => c.status === STATUS.VERIFIED).length;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex border-l border-slate-200">
@@ -236,12 +237,12 @@ const HRDashboard = () => {
                         </div>
                       </td>
                       <td className="py-6 px-4">
-                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${c.status === 'Verified' ? 'bg-green-100 text-green-700' :
-                          c.status === 'Rejected' ? 'bg-red-100 text-red-700' :
-                            c.status === 'Under Review' ? 'bg-blue-100 text-blue-700' :
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${c.status === STATUS.VERIFIED ? 'bg-green-100 text-green-700' :
+                          c.status === STATUS.REJECTED ? 'bg-red-100 text-red-700' :
+                            c.status === STATUS.UNDER_REVIEW ? 'bg-blue-100 text-blue-700' :
                               'bg-amber-100 text-amber-700'
                           }`}>
-                          {c.status}
+                          {STATUS_LABELS[c.status] || 'Unknown'}
                         </span>
                       </td>
                       <td className="py-6 px-4 text-sm text-slate-500 font-bold">
@@ -391,6 +392,7 @@ const HRDashboard = () => {
       {/* Chat Hub */}
       <ChatHub
         currentUserId={hrId}
+        currentUserRole={ROLES.HR}
       />
     </div>
   );

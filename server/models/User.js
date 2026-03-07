@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { ROLES, STATUS } = require('../constants');
 
 const UserSchema = new mongoose.Schema({
   uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
@@ -7,21 +8,21 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: {
-    type: String,
-    enum: ['ADMIN', 'HR', 'AGENT', 'CANDIDATE'],
-    default: 'CANDIDATE'
+    type: Number,
+    enum: [ROLES.ADMIN, ROLES.HR, ROLES.AGENT, ROLES.CANDIDATE],
+    default: ROLES.CANDIDATE
   },
   empid: { type: String },
   isFirstLogin: { type: Boolean, default: true },
   phoneNumber: { type: String },
   isPhoneVerified: { type: Boolean, default: false },
-  status: { type: String, default: 'Pending' },
-  assignedAgent: { type: String },   // stores agent uid
-  createdBy: { type: String },       // stores HR uid
+  status: { type: Number, default: STATUS.PENDING },
+  assignedAgent: { type: String },
+  createdBy: { type: String },
   taskCount: { type: Number, default: 0 },
   otp: { type: String },
   otpExpires: { type: Date },
-  bgvRequest: { type: String },      // stores BGVRequest uid
+  bgvRequest: { type: String },
   documents: {
     aadhar: String,
     pan: String,

@@ -5,6 +5,7 @@ const MasterRecord = require('./models/MasterRecord');
 const BGVRequest = require('./models/BGVRequest');
 const CandidateSubmission = require('./models/CandidateSubmission');
 const ChatMessage = require('./models/ChatMessage');
+const { ROLES } = require('./constants');
 require('dotenv').config();
 
 const seed = async () => {
@@ -32,14 +33,14 @@ const seed = async () => {
 
     // 1. Create Users for each role
     const users = [
-      { name: 'Admin User', email: 'admin@darwin.com', password, role: 'ADMIN' },
-      { name: 'HR Manager', email: 'hr@darwin.com', password, role: 'HR' },
-      { name: 'Agent Smith', email: 'agent@darwin.com', password, role: 'AGENT', taskCount: 0 },
+      { name: 'Admin User', email: 'admin@darwin.com', password, role: ROLES.ADMIN },
+      { name: 'HR Manager', email: 'hr@darwin.com', password, role: ROLES.HR },
+      { name: 'Agent Smith', email: 'agent@darwin.com', password, role: ROLES.AGENT, taskCount: 0 },
       {
         name: 'Candidate John',
         email: 'candidate@darwin.com',
         password,
-        role: 'CANDIDATE',
+        role: ROLES.CANDIDATE,
         phoneNumber: '9876543210'
       }
     ];

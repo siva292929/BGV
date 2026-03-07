@@ -1,21 +1,21 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const { STATUS, REVIEW } = require('../constants');
 
 const BGVRequestSchema = new mongoose.Schema({
     uid: { type: String, unique: true, default: () => crypto.randomBytes(4).toString('hex') },
-    candidate: { type: String, required: true },  // stores User uid
-    agent: { type: String },                       // stores User uid
-    hr: { type: String },                          // stores User uid
+    candidate: { type: String, required: true },
+    agent: { type: String },
+    hr: { type: String },
     status: {
-        type: String,
-        enum: ['Pending', 'Under Review', 'Verified', 'Rejected'],
-        default: 'Pending'
+        type: Number,
+        enum: [STATUS.PENDING, STATUS.UNDER_REVIEW, STATUS.VERIFIED, STATUS.REJECTED],
+        default: STATUS.PENDING
     },
     isFinalized: { type: Boolean, default: false },
     finalizedAt: { type: Date },
-    finalizedBy: { type: String },                 // stores User uid
+    finalizedBy: { type: String },
 
-    // HR-submitted reference data for cross-verification
     hrData: {
         tenthPercentage: String,
         twelfthPercentage: String,
@@ -32,19 +32,18 @@ const BGVRequestSchema = new mongoose.Schema({
         remarks: String
     },
 
-    // Document reviews by agent
     reviews: {
-        aadhar: { status: { type: String, default: 'Pending' }, comment: String },
-        pan: { status: { type: String, default: 'Pending' }, comment: String },
-        degree: { status: { type: String, default: 'Pending' }, comment: String },
-        twelfth: { status: { type: String, default: 'Pending' }, comment: String },
-        tenth: { status: { type: String, default: 'Pending' }, comment: String },
-        experience: { status: { type: String, default: 'Pending' }, comment: String },
-        payslip: { status: { type: String, default: 'Pending' }, comment: String },
-        releasingLetter: { status: { type: String, default: 'Pending' }, comment: String },
-        addressProof: { status: { type: String, default: 'Pending' }, comment: String },
-        bankStatement: { status: { type: String, default: 'Pending' }, comment: String },
-        signature: { status: { type: String, default: 'Pending' }, comment: String }
+        aadhar: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        pan: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        degree: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        twelfth: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        tenth: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        experience: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        payslip: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        releasingLetter: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        addressProof: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        bankStatement: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
+        signature: { status: { type: Number, default: REVIEW.PENDING }, comment: String }
     }
 }, { timestamps: true });
 

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ChatHub from '../components/ChatPanel';
+import { ROLES, STATUS, STATUS_LABELS, REVIEW, REVIEW_LABELS } from '../constants';
 
 const CandidateStatus = () => {
   const [status, setStatus] = useState(null);
@@ -142,12 +143,12 @@ const CandidateStatus = () => {
   };
 
   const getStatusIcon = (docStatus) => {
-    if (docStatus === 'Verified') return <CheckCircle className="text-green-600" size={24} />;
-    if (docStatus === 'Rejected') return <XCircle className="text-red-600" size={24} />;
+    if (docStatus === REVIEW.VERIFIED) return <CheckCircle className="text-green-600" size={24} />;
+    if (docStatus === REVIEW.REJECTED) return <XCircle className="text-red-600" size={24} />;
     return <Clock className="text-amber-600" size={24} />;
   };
 
-  const rejectedDocs = Object.entries(status.reviews).filter(([_, review]) => review.status === 'Rejected');
+  const rejectedDocs = Object.entries(status.reviews).filter(([_, review]) => review.status === REVIEW.REJECTED);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 to-slate-900 p-4 md:p-8">
@@ -275,15 +276,15 @@ const CandidateStatus = () => {
                       )}
                     </div>
                   </div>
-                  <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${review.status === 'Verified' ? 'bg-green-600/20 text-green-300' :
-                    review.status === 'Rejected' ? 'bg-red-600/20 text-red-300' :
+                  <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${review.status === REVIEW.VERIFIED ? 'bg-green-600/20 text-green-300' :
+                    review.status === REVIEW.REJECTED ? 'bg-red-600/20 text-red-300' :
                       'bg-amber-600/20 text-amber-300'
                     }`}>
-                    {review.status}
+                    {REVIEW_LABELS[review.status] || 'Pending'}
                   </span>
                 </div>
 
-                {review.status === 'Rejected' && (
+                {review.status === REVIEW.REJECTED && (
                   <div className="mt-3 pt-3 border-t border-white/10">
                     <button
                       onClick={() => setSelectedDoc(selectedDoc === docType ? null : docType)}
@@ -356,7 +357,7 @@ const CandidateStatus = () => {
           >
             Back to Portal
           </button>
-          {status.status === 'Verified' && (
+          {status.status === STATUS.VERIFIED && (
             <div className="bg-green-600/20 border border-green-600/50 text-green-300 px-8 py-4 rounded-2xl font-bold flex items-center gap-2">
               <CheckCircle size={20} /> Verification Complete!
             </div>
@@ -370,7 +371,7 @@ const CandidateStatus = () => {
       </div>
 
       {/* Chat Hub */}
-      <ChatHub currentUserId={userId} />
+      <ChatHub currentUserId={userId} currentUserRole={ROLES.CANDIDATE} />
     </div>
   );
 };

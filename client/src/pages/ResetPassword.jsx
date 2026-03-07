@@ -22,11 +22,11 @@ const ResetPassword = () => {
       await checkAuth();
 
       // Navigate based on role (matching Login.jsx logic)
-      const role = res.data.role;
-      if (role === 'ADMIN') navigate('/admin-dashboard');
-      else if (role === 'HR') navigate('/dashboard');
-      else if (role === 'AGENT') navigate('/agent-dashboard');
-      else if (role === 'CANDIDATE') navigate('/candidate-home');
+      const role = Number(res.data.role);
+      if (role === 0) navigate('/admin-dashboard');
+      else if (role === 1) navigate('/dashboard');
+      else if (role === 2) navigate('/agent-dashboard');
+      else if (role === 3) navigate('/candidate-home');
       else navigate('/');
 
     } catch (err) {

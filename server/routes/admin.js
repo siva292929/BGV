@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const User = require('../models/User');
 const emailService = require('../services/emailService');
+const { ROLES, ROLE_LABELS } = require('../constants');
 
 router.post('/create-hr', async (req, res) => {
   try {
@@ -14,18 +15,21 @@ router.post('/create-hr', async (req, res) => {
     const tempPassword = crypto.randomBytes(4).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
+    // role comes as a number from frontend (1=HR, 2=AGENT)
+    const roleNum = Number(role) || ROLES.HR;
+
     const newUser = new User({
       name,
       email,
       password: hashedPassword,
-      role: role || 'HR',
+      role: roleNum,
       empid,
       isFirstLogin: true
     });
 
     await newUser.save();
 
-    await emailService.sendCredentialsEmail(name, email, role || 'HR', tempPassword);
+    await emailService.sendCredentialsEmail(name, email, ROLE_LABELS[roleNum] || 'HR', tempPassword);
 
     res.json({ message: "Account Created Successfully!", tempPassword });
   } catch (err) {
@@ -36,7 +40,7 @@ router.post('/create-hr', async (req, res) => {
 // Fetches all staff (HR + AGENTS) for the dashboard
 router.get('/hrs', async (req, res) => {
   try {
-    const staff = await User.find({ role: { $in: ['HR', 'AGENT'] } }).select('-password').sort({ role: 1 }).lean();
+    const staff = await User.find({ role: { $in: [ROLES.HR, ROLES.AGENT] } }).select('-password').sort({ role: 1 }).lean();
     const cleaned = staff.map(u => { delete u._id; delete u.__v; return u; });
     res.json(cleaned);
   } catch (err) {

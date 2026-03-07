@@ -3,11 +3,12 @@ import axios from 'axios';
 import { UserPlus, Users, ShieldCheck, Trash2, Clipboard, HardDrive, LogOut, Loader2, ArrowRight, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { ROLES, ROLE_LABELS } from '../constants';
 
 
 const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
-  const [formData, setFormData] = useState({ name: '', email: '', empid: '', role: 'HR' });
+  const [formData, setFormData] = useState({ name: '', email: '', empid: '', role: ROLES.HR });
   const [successMsg, setSuccessMsg] = useState('');
   const [tempPass, setTempPass] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,9 +35,9 @@ const AdminDashboard = () => {
     setLoading(true);
     try {
       const res = await axios.post('http://localhost:5000/api/admin/create-hr', formData);
-      setSuccessMsg(`${formData.role} Account Created Successfully!`);
+      setSuccessMsg(`${ROLE_LABELS[formData.role]} Account Created Successfully!`);
       setTempPass(res.data.tempPassword);
-      setFormData({ name: '', email: '', empid: '', role: 'HR' });
+      setFormData({ name: '', email: '', empid: '', role: ROLES.HR });
       fetchUsers();
     } catch (err) {
       alert(err.response?.data?.error || "Error creating account");
@@ -57,8 +58,8 @@ const AdminDashboard = () => {
     navigate('/');
   };
 
-  const hrCount = users.filter(u => u.role === 'HR').length;
-  const agentCount = users.filter(u => u.role === 'AGENT').length;
+  const hrCount = users.filter(u => u.role === ROLES.HR).length;
+  const agentCount = users.filter(u => u.role === ROLES.AGENT).length;
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex border-l border-slate-200">
@@ -140,10 +141,10 @@ const AdminDashboard = () => {
                 <select
                   className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold focus:border-indigo-600 outline-none transition appearance-none"
                   value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, role: Number(e.target.value) })}
                 >
-                  <option value="HR">Human Resources</option>
-                  <option value="AGENT">Verification Agent</option>
+                  <option value={ROLES.HR}>Human Resources</option>
+                  <option value={ROLES.AGENT}>Verification Agent</option>
                 </select>
               </div>
 
@@ -221,9 +222,9 @@ const AdminDashboard = () => {
                         </div>
                       </td>
                       <td className="py-6 px-4">
-                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${u.role === 'HR' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${u.role === ROLES.HR ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
                           }`}>
-                          {u.role === 'HR' ? 'Resources' : 'Verifier'}
+                          {u.role === ROLES.HR ? 'Resources' : 'Verifier'}
                         </span>
                       </td>
                       <td className="py-6 px-4 font-mono text-xs font-bold text-slate-500">{u.empid}</td>
