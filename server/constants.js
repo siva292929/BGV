@@ -41,4 +41,26 @@ const REVIEW_LABELS = {
     [REVIEW.REJECTED]: 'Rejected'
 };
 
-module.exports = { ROLES, ROLE_LABELS, STATUS, STATUS_LABELS, REVIEW, REVIEW_LABELS };
+// ─── AI VERDICT ─────────────────────────────────────────────────────────────
+const AI_VERDICT = {
+    PENDING: 0,
+    AUTO_VERIFIED: 1,
+    NEEDS_REVIEW: 2,
+    FLAGGED: 3
+};
+
+const AI_VERDICT_LABELS = {
+    [AI_VERDICT.PENDING]: 'Pending',
+    [AI_VERDICT.AUTO_VERIFIED]: 'Auto-Verified',
+    [AI_VERDICT.NEEDS_REVIEW]: 'Needs Review',
+    [AI_VERDICT.FLAGGED]: 'Flagged'
+};
+
+// ─── VERIFICATION SOURCE ────────────────────────────────────────────────────
+const VERIFIED_BY = {
+    AI: 'AI (OCR Match)',
+    AUTOFETCH: 'Official Database (Autofetch)',
+    MANUAL: 'Manual Audit'
+};
+
+module.exports = { ROLES, ROLE_LABELS, STATUS, STATUS_LABELS, REVIEW, REVIEW_LABELS, AI_VERDICT, AI_VERDICT_LABELS, VERIFIED_BY };

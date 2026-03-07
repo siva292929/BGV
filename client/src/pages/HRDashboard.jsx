@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { UserPlus, UserCheck, Clock, Mail, LogOut, Loader2, ArrowRight, User as UserIcon, ShieldCheck, Briefcase, MessageCircle, FileText, Building } from 'lucide-react';
+import { UserPlus, UserCheck, Clock, Mail, LogOut, Loader2, ArrowRight, User as UserIcon, ShieldCheck, Briefcase, MessageCircle, FileText, Building, Upload, Download } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { STATUS, STATUS_LABELS, ROLES } from '../constants';
@@ -8,19 +8,17 @@ import ChatHub from '../components/ChatPanel';
 
 const HRDashboard = () => {
   const [candidates, setCandidates] = useState([]);
-  const [formData, setFormData] = useState({ name: '', email: '' });
-  const [successMsg, setSuccessMsg] = useState('');
-  const [tempPass, setTempPass] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState(null);
-  const [showHRDataModal, setShowHRDataModal] = useState(false);
-  const [hrDataCandidate, setHrDataCandidate] = useState(null);
-  const [hrDataForm, setHrDataForm] = useState({
+  const [formData, setFormData] = useState({
+    name: '', email: '',
+    aadharNumber: '', panNumber: '',
     tenthPercentage: '', twelfthPercentage: '', degreeGPA: '', degreeName: '', degreeUniversity: '',
     previousCompany: '', previousDesignation: '', previousDuration: '',
     hrContactName: '', hrContactEmail: '', hrContactPhone: '', ctc: '', remarks: ''
   });
-  const [hrDataLoading, setHrDataLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [tempPass, setTempPass] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [bulkImportLoading, setBulkImportLoading] = useState(false);
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -48,7 +46,13 @@ const HRDashboard = () => {
       const res = await axios.post('http://localhost:5000/api/hr/create-candidate', { ...formData, hrId });
       setSuccessMsg("Candidate Created & Assigned!");
       setTempPass(res.data.tempPassword);
-      setFormData({ name: '', email: '' });
+      setFormData({
+        name: '', email: '',
+        aadharNumber: '', panNumber: '',
+        tenthPercentage: '', twelfthPercentage: '', degreeGPA: '', degreeName: '', degreeUniversity: '',
+        previousCompany: '', previousDesignation: '', previousDuration: '',
+        hrContactName: '', hrContactEmail: '', hrContactPhone: '', ctc: '', remarks: ''
+      });
       fetchCandidates();
     } catch (err) {
       alert(err.response?.data?.error || "Error creating candidate");
@@ -62,29 +66,30 @@ const HRDashboard = () => {
     navigate('/');
   };
 
-  const openHRDataModal = (candidate) => {
-    setHrDataCandidate(candidate);
-    setHrDataForm({
-      tenthPercentage: '', twelfthPercentage: '', degreeGPA: '', degreeName: '', degreeUniversity: '',
-      previousCompany: '', previousDesignation: '', previousDuration: '',
-      hrContactName: '', hrContactEmail: '', hrContactPhone: '', ctc: '', remarks: ''
-    });
-    setShowHRDataModal(true);
-  };
+  const handleBulkImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-  const submitHRData = async () => {
-    setHrDataLoading(true);
+    const formDataObj = new FormData();
+    formDataObj.append('file', file);
+    formDataObj.append('hrId', hrId);
+
+    setBulkImportLoading(true);
     try {
-      await axios.post(`http://localhost:5000/api/hr/submit-hr-data/${hrDataCandidate.uid}`, hrDataForm);
-      alert("Reference data submitted successfully! Agent can now cross-verify.");
-      setShowHRDataModal(false);
+      const res = await axios.post('http://localhost:5000/api/hr/bulk-import', formDataObj, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      alert(`Successfully imported ${res.data.importedCount} candidates. ${res.data.errorCount} error(s).`);
       fetchCandidates();
     } catch (err) {
-      alert(err.response?.data?.error || "Failed to submit data");
+      alert(`Import failed: ${err.response?.data?.error || err.message}`);
     } finally {
-      setHrDataLoading(false);
+      setBulkImportLoading(false);
+      e.target.value = null; // Clear input
     }
   };
+
+
 
   const pendingCount = candidates.filter(c => c.status === STATUS.PENDING).length;
   const reviewCount = candidates.filter(c => c.status === STATUS.UNDER_REVIEW).length;
@@ -164,7 +169,36 @@ const HRDashboard = () => {
               <h2 className="text-xl font-black text-slate-900 tracking-tight">New Candidate</h2>
             </div>
 
+            {/* Bulk Import Option */}
+            <div className="mb-10 p-6 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bulk Invite</span>
+                <a href="#" className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline" onClick={(e) => {
+                  e.preventDefault();
+                  const headers = "name,email,aadharNumber,panNumber,tenthPercentage,twelfthPercentage,degreeGPA,degreeName,degreeUniversity,previousCompany,previousDesignation,previousDuration,ctc,remarks";
+                  const row1 = "John Doe,john@example.com,123456789012,ABCDE1234F,85,88,8.5,B.Tech CSE,IIT Bombay,Tech Corp,Software Engineer,2 years,12 LPA,Excellent candidate";
+                  const csvContent = `${headers}\n${row1}`;
+                  const blob = new Blob([csvContent], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = "sample_candidates_with_reference.csv";
+                  link.click();
+                }}>Download Sample</a>
+              </div>
+              <label className="flex flex-col items-center justify-center gap-3 cursor-pointer group">
+                <input type="file" className="hidden" accept=".csv" onChange={handleBulkImport} disabled={bulkImportLoading} />
+                <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:scale-110 transition-all shadow-sm">
+                  {bulkImportLoading ? <Loader2 className="animate-spin" /> : <Upload size={24} />}
+                </div>
+                <span className="text-xs font-bold text-slate-500 group-hover:text-slate-900 transition-colors">
+                  {bulkImportLoading ? "Importing candidates..." : "Upload CSV to invite candidates in bulk"}
+                </span>
+              </label>
+            </div>
+
             <form onSubmit={handleAddCandidate} className="space-y-6">
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
                 <input type="text" placeholder="e.g. John Doe" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold focus:border-blue-600 outline-none"
@@ -175,6 +209,74 @@ const HRDashboard = () => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
                 <input type="email" placeholder="john@email.com" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl font-bold focus:border-blue-600 outline-none"
                   value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required />
+              </div>
+
+              {/* Identity */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🪪 Identity</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Aadhaar Number" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.aadharNumber} onChange={e => setFormData({ ...formData, aadharNumber: e.target.value })} />
+                  <input type="text" placeholder="PAN Number" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.panNumber} onChange={e => setFormData({ ...formData, panNumber: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Academic */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🎓 Academic</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <input type="text" placeholder="10th %" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.tenthPercentage} onChange={e => setFormData({ ...formData, tenthPercentage: e.target.value })} />
+                  <input type="text" placeholder="12th %" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.twelfthPercentage} onChange={e => setFormData({ ...formData, twelfthPercentage: e.target.value })} />
+                  <input type="text" placeholder="Degree GPA" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.degreeGPA} onChange={e => setFormData({ ...formData, degreeGPA: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Degree Name (e.g. B.Tech CSE)" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.degreeName} onChange={e => setFormData({ ...formData, degreeName: e.target.value })} />
+                  <input type="text" placeholder="University" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.degreeUniversity} onChange={e => setFormData({ ...formData, degreeUniversity: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Experience */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">💼 Previous Employment</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Company" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.previousCompany} onChange={e => setFormData({ ...formData, previousCompany: e.target.value })} />
+                  <input type="text" placeholder="Designation" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.previousDesignation} onChange={e => setFormData({ ...formData, previousDesignation: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Duration (e.g. 2 years)" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.previousDuration} onChange={e => setFormData({ ...formData, previousDuration: e.target.value })} />
+                  <input type="text" placeholder="CTC (e.g. 12 LPA)" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.ctc} onChange={e => setFormData({ ...formData, ctc: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Previous HR Contact */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">📞 Previous HR Contact</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <input type="text" placeholder="Contact Name" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.hrContactName} onChange={e => setFormData({ ...formData, hrContactName: e.target.value })} />
+                  <input type="email" placeholder="Contact Email" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.hrContactEmail} onChange={e => setFormData({ ...formData, hrContactEmail: e.target.value })} />
+                  <input type="tel" placeholder="Contact Phone" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600"
+                    value={formData.hrContactPhone} onChange={e => setFormData({ ...formData, hrContactPhone: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">📝 Remarks</p>
+                <textarea placeholder="Any notes for the verification agent..." rows={2}
+                  className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-2xl text-sm font-bold outline-none focus:border-blue-600 resize-none"
+                  value={formData.remarks} onChange={e => setFormData({ ...formData, remarks: e.target.value })} />
               </div>
 
               <button disabled={loading} className="w-full bg-slate-950 hover:bg-blue-600 text-white p-5 rounded-2xl transition-all font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-100 flex items-center justify-center gap-2 group">
@@ -233,6 +335,11 @@ const HRDashboard = () => {
                           <div>
                             <p className="font-black text-slate-900 text-sm">{c.name}</p>
                             <p className="text-xs text-slate-400 font-medium">{c.email}</p>
+                            {c.executiveSummary && (
+                              <p className="text-[10px] text-blue-600 font-bold mt-1 max-w-xs line-clamp-1 italic">
+                                "{c.executiveSummary}"
+                              </p>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -250,16 +357,15 @@ const HRDashboard = () => {
                       </td>
                       <td className="py-6 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {c.status !== 'Pending' && (
+                          {c.bgvRequest && (
                             <button
-                              onClick={() => openHRDataModal(c)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                              title="Submit Reference Data"
+                              onClick={() => window.open(`http://localhost:5000/api/hr/report/${c.uid}`, '_blank')}
+                              className="p-2 bg-slate-100 hover:bg-blue-600 hover:text-white rounded-xl transition-all group/btn"
+                              title="Download BGV Report"
                             >
-                              <FileText size={18} />
+                              <Download size={16} />
                             </button>
                           )}
-
                         </div>
                       </td>
                     </tr>
@@ -279,115 +385,6 @@ const HRDashboard = () => {
         </div>
       </main>
 
-      {/* HR Data Modal */}
-      {showHRDataModal && hrDataCandidate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Submit Reference Data</h3>
-                <p className="text-slate-400 text-sm mt-1">For: <strong>{hrDataCandidate.name}</strong></p>
-              </div>
-              <button onClick={() => setShowHRDataModal(false)} className="text-slate-400 hover:text-slate-900 text-2xl font-bold">✕</button>
-            </div>
-
-            <div className="space-y-8">
-              {/* Academic */}
-              <div className="space-y-4">
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Building size={16} /> Academic Records</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">10th %</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.tenthPercentage} onChange={e => setHrDataForm({ ...hrDataForm, tenthPercentage: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">12th %</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.twelfthPercentage} onChange={e => setHrDataForm({ ...hrDataForm, twelfthPercentage: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Degree GPA</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.degreeGPA} onChange={e => setHrDataForm({ ...hrDataForm, degreeGPA: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Degree Name</label>
-                    <input type="text" placeholder="e.g. B.Tech CSE" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.degreeName} onChange={e => setHrDataForm({ ...hrDataForm, degreeName: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">University</label>
-                    <input type="text" placeholder="University name" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.degreeUniversity} onChange={e => setHrDataForm({ ...hrDataForm, degreeUniversity: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Professional */}
-              <div className="space-y-4">
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Briefcase size={16} /> Previous Employment</p>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Company</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.previousCompany} onChange={e => setHrDataForm({ ...hrDataForm, previousCompany: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Designation</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.previousDesignation} onChange={e => setHrDataForm({ ...hrDataForm, previousDesignation: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Duration</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.previousDuration} onChange={e => setHrDataForm({ ...hrDataForm, previousDuration: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">HR Contact Name</label>
-                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.hrContactName} onChange={e => setHrDataForm({ ...hrDataForm, hrContactName: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">HR Email</label>
-                    <input type="email" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.hrContactEmail} onChange={e => setHrDataForm({ ...hrDataForm, hrContactEmail: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">HR Phone</label>
-                    <input type="tel" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.hrContactPhone} onChange={e => setHrDataForm({ ...hrDataForm, hrContactPhone: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">CTC</label>
-                    <input type="text" placeholder="e.g. 12 LPA" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.ctc} onChange={e => setHrDataForm({ ...hrDataForm, ctc: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Remarks</label>
-                    <input type="text" placeholder="Any notes" className="w-full bg-slate-50 border-2 border-slate-100 p-3 rounded-xl font-bold outline-none focus:border-blue-600"
-                      value={hrDataForm.remarks} onChange={e => setHrDataForm({ ...hrDataForm, remarks: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={submitHRData}
-                disabled={hrDataLoading}
-                className="w-full bg-blue-600 text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {hrDataLoading ? <Loader2 className="animate-spin" /> : <>Submit Reference Data <ArrowRight size={18} /></>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Chat Hub */}
       <ChatHub

@@ -40,3 +40,18 @@ export const REVIEW_LABELS = {
     [REVIEW.VERIFIED]: 'Verified',
     [REVIEW.REJECTED]: 'Rejected'
 };
+
+// ─── AI VERDICT ─────────────────────────────────────────────────────────────
+export const AI_VERDICT = {
+    PENDING: 0,
+    AUTO_VERIFIED: 1,
+    NEEDS_REVIEW: 2,
+    FLAGGED: 3
+};
+
+export const AI_VERDICT_LABELS = {
+    [AI_VERDICT.PENDING]: 'Pending',
+    [AI_VERDICT.AUTO_VERIFIED]: 'Auto-Verified',
+    [AI_VERDICT.NEEDS_REVIEW]: 'Needs Review',
+    [AI_VERDICT.FLAGGED]: 'Flagged'
+};

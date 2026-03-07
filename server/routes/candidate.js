@@ -5,7 +5,8 @@ const BGVRequest = require('../models/BGVRequest');
 const CandidateSubmission = require('../models/CandidateSubmission');
 const emailService = require('../services/emailService');
 const { upload, cloudinary } = require('../config/cloudinary');
-const { ROLES, STATUS, STATUS_LABELS, REVIEW } = require('../constants');
+const { ROLES, STATUS, STATUS_LABELS, REVIEW, AI_VERDICT, VERIFIED_BY } = require('../constants');
+const { verifyAllDocuments, generateExecutiveSummary } = require('../services/aiVerificationService');
 
 // --- FETCH CURRENT STATUS FOR PERSISTENCE ---
 router.get('/status/:userId', async (req, res) => {
@@ -147,10 +148,7 @@ router.post('/upload-docs', (req, res, next) => {
     // --- AUTO-ASSIGNMENT LOGIC: Least taskCount ---
     const bestAgent = await User.findOne({ role: ROLES.AGENT }).sort({ taskCount: 1 });
 
-    // --- AUTO-VERIFICATION LOGIC ---
-    const trimmedPhone = user.phoneNumber ? user.phoneNumber.trim() : null;
-    const masterRecord = trimmedPhone ? await MasterRecord.findOne({ phoneNumber: trimmedPhone }) : null;
-
+    // Initialize all reviews as pending
     const reviews = {
       aadhar: { status: REVIEW.PENDING },
       pan: { status: REVIEW.PENDING },
@@ -165,23 +163,30 @@ router.post('/upload-docs', (req, res, next) => {
       signature: { status: REVIEW.PENDING }
     };
 
-    // ONLY auto-verify Aadhaar and PAN from MasterRecord
-    if (masterRecord) {
-      if (masterRecord.aadharNumber) reviews.aadhar = { status: REVIEW.VERIFIED, comment: 'Auto-verified from Master Database' };
-      if (masterRecord.panNumber) reviews.pan = { status: REVIEW.VERIFIED, comment: 'Auto-verified from Master Database' };
+    // 1. Find existing BGVRequest (created by HR) or create new
+    let newBGVRequest = await BGVRequest.findOne({ candidate: userId });
+    if (newBGVRequest) {
+      // Update existing BGVRequest with upload data
+      newBGVRequest.agent = bestAgent ? bestAgent.uid : newBGVRequest.agent;
+      newBGVRequest.hr = user.createdBy || newBGVRequest.hr;
+      newBGVRequest.status = STATUS.UNDER_REVIEW;
+      newBGVRequest.reviews = reviews;
+    } else {
+      // Create fresh BGVRequest
+      newBGVRequest = new BGVRequest({
+        candidate: userId,
+        agent: bestAgent ? bestAgent.uid : null,
+        hr: user.createdBy || null,
+        status: STATUS.UNDER_REVIEW,
+        reviews: reviews
+      });
     }
-
-    // 1. Create BGVRequest Record
-    const newBGVRequest = new BGVRequest({
-      candidate: userId,
-      agent: bestAgent ? bestAgent.uid : null,
-      hr: user.createdBy || null,
-      status: STATUS.UNDER_REVIEW,
-      reviews: reviews
-    });
     await newBGVRequest.save();
 
     // 2. Create/Update CandidateSubmission
+    const trimmedPhone = user.phoneNumber ? user.phoneNumber.trim() : null;
+    const masterRecord = trimmedPhone ? await MasterRecord.findOne({ phoneNumber: trimmedPhone }) : null;
+
     const submissionData = {
       email: user.email,
       fullName: user.name,
@@ -231,9 +236,73 @@ router.post('/upload-docs', (req, res, next) => {
 
     await User.findOneAndUpdate({ uid: userId }, updateData);
 
+    // 3. 🤖 TRIGGER AI VERIFICATION (ASYNC — doesn't block response)
+    (async () => {
+      try {
+        console.log(`🤖 Starting AI verification for request ${newBGVRequest.uid}...`);
+        // Fetch hrData from the BGVRequest (HR may have submitted reference data already)
+        const freshBgv = await BGVRequest.findOne({ uid: newBGVRequest.uid });
+        const hrData = freshBgv?.hrData || {};
+        const aiResults = await verifyAllDocuments(docPaths, hrData);
+
+        // Save AI results to BGVRequest
+        const bgvToUpdate = await BGVRequest.findOne({ uid: newBGVRequest.uid });
+        if (bgvToUpdate) {
+          bgvToUpdate.aiVerification = aiResults;
+          bgvToUpdate.aiProcessed = true;
+
+          // --- 1. Autofetch Verification (Match MasterRecord with HR Data) ---
+          const submission = await CandidateSubmission.findOne({ email: user.email });
+          const autofetch = submission?.autofetchedDetails || {};
+
+          const autofetchMatch = (key, hrKey) => {
+            if (!autofetch[key] || !hrData[hrKey]) return false;
+            return autofetch[key].toString().trim().toLowerCase() === hrData[hrKey].toString().trim().toLowerCase();
+          };
+
+          if (autofetchMatch('aadharNumber', 'aadharNumber')) {
+            bgvToUpdate.reviews.aadhar = { status: REVIEW.VERIFIED, comment: 'Verified via Official Database (Autofetch)', verifiedBy: VERIFIED_BY.AUTOFETCH };
+          }
+          if (autofetchMatch('panNumber', 'panNumber')) {
+            bgvToUpdate.reviews.pan = { status: REVIEW.VERIFIED, comment: 'Verified via Official Database (Autofetch)', verifiedBy: VERIFIED_BY.AUTOFETCH };
+          }
+          if (autofetchMatch('tenthPercentage', 'tenthPercentage')) {
+            bgvToUpdate.reviews.tenth = { status: REVIEW.VERIFIED, comment: 'Verified via Official Database (Autofetch)', verifiedBy: VERIFIED_BY.AUTOFETCH };
+          }
+          if (autofetchMatch('twelfthPercentage', 'twelfthPercentage')) {
+            bgvToUpdate.reviews.twelfth = { status: REVIEW.VERIFIED, comment: 'Verified via Official Database (Autofetch)', verifiedBy: VERIFIED_BY.AUTOFETCH };
+          }
+          if (autofetchMatch('degreeGPA', 'degreeGPA')) {
+            bgvToUpdate.reviews.degree = { status: REVIEW.VERIFIED, comment: 'Verified via Official Database (Autofetch)', verifiedBy: VERIFIED_BY.AUTOFETCH };
+          }
+          if (autofetchMatch('previousCompany', 'previousCompany')) {
+            bgvToUpdate.reviews.experience = { status: REVIEW.VERIFIED, comment: 'Verified via Official Database (Autofetch)', verifiedBy: VERIFIED_BY.AUTOFETCH };
+          }
+
+          // --- 2. AI Auto-Verification (If not already verified by Autofetch) ---
+          for (const [docType, aiResult] of Object.entries(aiResults)) {
+            // Only update if PENDING (to preserve Autofetch verification)
+            if (aiResult.verdict === AI_VERDICT.AUTO_VERIFIED && bgvToUpdate.reviews[docType]?.status === REVIEW.PENDING) {
+              bgvToUpdate.reviews[docType].status = REVIEW.VERIFIED;
+              bgvToUpdate.reviews[docType].comment = `AI Auto-Verified (${aiResult.confidence}% confidence)`;
+              bgvToUpdate.reviews[docType].verifiedBy = VERIFIED_BY.AI;
+            }
+          }
+
+          // Generate Executive Summary (Now passing full bgvToUpdate info)
+          bgvToUpdate.executiveSummary = generateExecutiveSummary(bgvToUpdate);
+
+          await bgvToUpdate.save();
+          console.log(`✅ AI verification saved for ${newBGVRequest.uid}`);
+        }
+      } catch (aiErr) {
+        console.error('❌ AI verification background error:', aiErr.message);
+      }
+    })();
+
     res.json({
       success: true,
-      message: bestAgent ? `Documents uploaded and assigned to Agent ${bestAgent.name}` : "Documents uploaded successfully",
+      message: bestAgent ? `Documents uploaded and assigned to Agent ${bestAgent.name}. AI verification in progress...` : "Documents uploaded. AI verification in progress...",
       assignedAgent: bestAgent ? bestAgent.name : null,
       requestId: newBGVRequest.uid
     });
@@ -267,7 +336,11 @@ router.post('/update-review', async (req, res) => {
       return res.json({ success: true, message: "No changes detected", status: request.status });
     }
 
-    request.reviews[documentType] = { status, comment };
+    request.reviews[documentType] = {
+      status,
+      comment,
+      verifiedBy: status === REVIEW.VERIFIED ? VERIFIED_BY.MANUAL : null
+    };
 
     // Check if all documents are verified
     const reviewStates = Object.values(request.reviews).map(r => r.status);
@@ -277,6 +350,7 @@ router.post('/update-review', async (req, res) => {
       request.status = STATUS.UNDER_REVIEW;
     }
 
+    request.executiveSummary = generateExecutiveSummary(request);
     await request.save();
 
     // Sync status back to User model
@@ -387,16 +461,70 @@ router.post('/re-upload-document', upload.single('document'), async (req, res) =
       bgvRequest.status = STATUS.UNDER_REVIEW;
       bgvRequest.isFinalized = false; // Unlock case for re-review
       await bgvRequest.save();
+
+      // 🤖 Re-run AI verification on the re-uploaded document (async)
+      const { verifyDocument } = require('../services/aiVerificationService');
+      (async () => {
+        try {
+          console.log(`🤖 Re-running AI on ${documentType} for ${bgvRequestId}...`);
+          const freshBgv = await BGVRequest.findOne({ uid: bgvRequestId });
+          const hrData = freshBgv?.hrData || {};
+          const aiResult = await verifyDocument(documentType, cloudinaryUrl, hrData);
+
+          const bgvToUpdate = await BGVRequest.findOne({ uid: bgvRequestId });
+          if (bgvToUpdate) {
+            bgvToUpdate.aiVerification.set(documentType, aiResult);
+            // Auto-verify if high confidence
+            if (aiResult.verdict === AI_VERDICT.AUTO_VERIFIED && bgvToUpdate.reviews[documentType]) {
+              bgvToUpdate.reviews[documentType].status = REVIEW.VERIFIED;
+              bgvToUpdate.reviews[documentType].comment = `AI Auto-Verified (${aiResult.confidence}% confidence)`;
+              bgvToUpdate.reviews[documentType].verifiedBy = VERIFIED_BY.AI;
+            }
+          }
+          bgvToUpdate.executiveSummary = generateExecutiveSummary(bgvToUpdate);
+          await bgvToUpdate.save();
+          console.log(`✅ AI re-verification done for ${documentType}`);
+        } catch (e) {
+          console.error('❌ AI re-verification error:', e.message);
+        }
+      })();
     }
 
     // 3. Update User status
     candidate.status = STATUS.UNDER_REVIEW;
     await candidate.save();
 
-    res.json({ success: true, message: `${documentType} re-uploaded successfully. Awaiting review.` });
+    res.json({ success: true, message: `${documentType} re-uploaded successfully. AI re-verification in progress...` });
   } catch (err) {
     console.error('❌ Re-upload error:', err);
     res.status(500).json({ error: "Failed to re-upload document" });
+  }
+});
+
+// 6. AI VERIFICATION STATUS (polling endpoint)
+router.get('/ai-status/:requestId', async (req, res) => {
+  try {
+    const bgvRequest = await BGVRequest.findOne({ uid: req.params.requestId }).lean();
+    if (!bgvRequest) return res.status(404).json({ error: "Request not found" });
+
+    // Convert Map to plain object
+    const aiVerification = bgvRequest.aiVerification || {};
+    const aiData = {};
+    if (aiVerification instanceof Map) {
+      for (const [key, value] of aiVerification) {
+        aiData[key] = value;
+      }
+    } else {
+      Object.assign(aiData, aiVerification);
+    }
+
+    res.json({
+      aiProcessed: bgvRequest.aiProcessed || false,
+      aiVerification: aiData,
+      reviews: bgvRequest.reviews
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

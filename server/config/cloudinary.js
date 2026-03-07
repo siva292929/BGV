@@ -14,7 +14,7 @@ const storage = new CloudinaryStorage({
         // Determine resource type based on file mimetype
         let resourceType = 'auto';
         if (file.mimetype === 'application/pdf') {
-            resourceType = 'raw';
+            resourceType = 'image';
         }
 
         return {

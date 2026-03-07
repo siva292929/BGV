@@ -269,9 +269,20 @@ const AgentDashboard = () => {
               <div className="grid grid-cols-1 gap-6">
                 <div className="flex justify-between items-center px-1">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Document Audit</p>
-                  {selectedTask.submission?.submittedDetails?.isFresher && (
-                    <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">FRESHER</span>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {selectedTask.submission?.submittedDetails?.isFresher && (
+                      <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">FRESHER</span>
+                    )}
+                    {bgvReq?.aiProcessed ? (
+                      <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                        🤖 AI Processed
+                      </span>
+                    ) : (
+                      <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse">
+                        🤖 AI Processing...
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {allDocTypes.map(doc => {
                   if (selectedTask.submission?.submittedDetails?.isFresher && ['experience', 'payslip', 'releasingLetter', 'bankStatement'].includes(doc)) return null;
@@ -279,71 +290,120 @@ const AgentDashboard = () => {
                   const docPath = selectedTask.submission?.documents?.[doc] || selectedTask.documents?.[doc];
                   const review = bgvReq?.reviews?.[doc];
                   if (!review) return null;
-                  const isAutoVerified = review?.comment?.includes('Auto-verified');
+                  const isAutoVerified = review?.comment?.includes('Auto-Verified') || review?.comment?.includes('Auto-verified');
+
+                  // AI verification data for this document
+                  const aiData = bgvReq?.aiVerification?.[doc] || bgvReq?.aiVerification?.get?.(doc);
+                  const aiConfidence = aiData?.confidence ?? null;
+                  const aiVerdict = aiData?.verdict;
+                  const aiDetails = aiData?.matchDetails;
+                  const aiExtracted = aiData?.extractedData;
+
+                  const getAiBadgeColor = () => {
+                    if (aiConfidence === null) return 'bg-slate-100 text-slate-400';
+                    if (aiConfidence >= 85) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+                    if (aiConfidence >= 50) return 'bg-amber-100 text-amber-700 border-amber-200';
+                    return 'bg-red-100 text-red-700 border-red-200';
+                  };
 
                   return (
-                    <div key={doc} className={`bg-white p-8 rounded-[40px] border-2 shadow-sm flex flex-col md:flex-row items-center justify-between gap-8 group transition-all ${isAutoVerified ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100 hover:border-emerald-500'}`}>
-                      <div className="flex items-center gap-6 flex-1">
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isAutoVerified ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600'}`}>
-                          {['aadhar', 'pan', 'addressProof'].includes(doc) ? <Shield size={24} /> :
-                            ['degree', 'twelfth', 'tenth'].includes(doc) ? <GraduationCap size={24} /> :
-                              ['experience', 'payslip', 'releasingLetter', 'bankStatement'].includes(doc) ? <Briefcase size={24} /> : <FileText size={24} />}
-                        </div>
-                        <div className="text-left">
-                          <p className="text-lg font-black text-slate-900 uppercase tracking-tight">{docLabels[doc] || doc}</p>
-                          <div className="flex items-center gap-2">
-                            <p className={`text-[10px] font-black uppercase tracking-widest ${review?.status === REVIEW.VERIFIED ? 'text-emerald-600' :
-                              review?.status === REVIEW.REJECTED ? 'text-red-600' : 'text-slate-400'
-                              }`}>{REVIEW_LABELS[review?.status] || 'Pending'}</p>
-                            {isAutoVerified && (
-                              <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">Auto-Verified</span>
-                            )}
+                    <div key={doc} className={`bg-white p-8 rounded-[40px] border-2 shadow-sm flex flex-col gap-4 group transition-all ${isAutoVerified ? 'border-emerald-100 bg-emerald-50/10' : 'border-slate-100 hover:border-emerald-500'}`}>
+                      {/* Document Header Row */}
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-6 flex-1">
+                          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${isAutoVerified ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600'}`}>
+                            {['aadhar', 'pan', 'addressProof'].includes(doc) ? <Shield size={24} /> :
+                              ['degree', 'twelfth', 'tenth'].includes(doc) ? <GraduationCap size={24} /> :
+                                ['experience', 'payslip', 'releasingLetter', 'bankStatement'].includes(doc) ? <Briefcase size={24} /> : <FileText size={24} />}
                           </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
-                        {!isAutoVerified && !bgvReq?.isFinalized ? (
-                          <>
-                            <input
-                              placeholder="Add note..."
-                              className="bg-slate-50 border-2 border-slate-100 p-3 px-5 rounded-2xl text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-600 transition-all w-full md:w-48"
-                              value={commentDrafts[doc] || ''}
-                              onChange={(e) => setCommentDrafts(prev => ({ ...prev, [doc]: e.target.value }))}
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleReviewDoc(doc, REVIEW.VERIFIED)}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === REVIEW.VERIFIED ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}>
-                                Verify
-                              </button>
-                              <button
-                                onClick={() => handleReviewDoc(doc, REVIEW.REJECTED)}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === REVIEW.REJECTED ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'}`}>
-                                Flag
-                              </button>
+                          <div className="text-left">
+                            <p className="text-lg font-black text-slate-900 uppercase tracking-tight">{docLabels[doc] || doc}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className={`text-[10px] font-black uppercase tracking-widest ${review?.status === REVIEW.VERIFIED ? 'text-emerald-600' :
+                                review?.status === REVIEW.REJECTED ? 'text-red-600' : 'text-slate-400'
+                                }`}>{REVIEW_LABELS[review?.status] || 'Pending'}</p>
+                              {isAutoVerified && (
+                                <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest">AI Verified</span>
+                              )}
+                              {/* AI Confidence Badge */}
+                              {aiConfidence !== null && (
+                                <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border ${getAiBadgeColor()}`}>
+                                  🤖 {aiConfidence}%
+                                </span>
+                              )}
                             </div>
-                          </>
-                        ) : isAutoVerified ? (
-                          <div className="bg-emerald-100/50 px-6 py-3 rounded-2xl border border-emerald-200">
-                            <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Auto-Verified via Master DB</p>
                           </div>
-                        ) : (
-                          <div className="bg-red-100/50 px-6 py-3 rounded-2xl border border-red-200">
-                            <p className="text-[10px] font-black text-red-800 uppercase tracking-widest">Case Finalized</p>
-                          </div>
-                        )}
+                        </div>
 
-                        {docPath ? (
-                          <a href={docPath} target="_blank" rel="noreferrer" className="p-4 bg-slate-950 text-white rounded-2xl hover:bg-emerald-600 transition-all shadow-lg">
-                            <ExternalLink size={18} />
-                          </a>
-                        ) : (
-                          <div className="p-4 bg-slate-100 text-slate-300 rounded-2xl cursor-not-allowed" title="No document">
-                            <ExternalLink size={18} />
-                          </div>
-                        )}
+                        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                          {!isAutoVerified && !bgvReq?.isFinalized ? (
+                            <>
+                              <input
+                                placeholder="Add note..."
+                                className="bg-slate-50 border-2 border-slate-100 p-3 px-5 rounded-2xl text-[10px] font-bold text-slate-600 outline-none focus:border-emerald-600 transition-all w-full md:w-48"
+                                value={commentDrafts[doc] || ''}
+                                onChange={(e) => setCommentDrafts(prev => ({ ...prev, [doc]: e.target.value }))}
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleReviewDoc(doc, REVIEW.VERIFIED)}
+                                  className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === REVIEW.VERIFIED ? 'bg-emerald-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}>
+                                  Verify
+                                </button>
+                                <button
+                                  onClick={() => handleReviewDoc(doc, REVIEW.REJECTED)}
+                                  className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${review?.status === REVIEW.REJECTED ? 'bg-red-600 text-white shadow-lg' : 'bg-slate-100 text-slate-400 hover:bg-red-50 hover:text-red-600'}`}>
+                                  Flag
+                                </button>
+                              </div>
+                            </>
+                          ) : isAutoVerified ? (
+                            <div className="bg-emerald-100/50 px-6 py-3 rounded-2xl border border-emerald-200">
+                              <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">AI Auto-Verified</p>
+                            </div>
+                          ) : (
+                            <div className="bg-red-100/50 px-6 py-3 rounded-2xl border border-red-200">
+                              <p className="text-[10px] font-black text-red-800 uppercase tracking-widest">Case Finalized</p>
+                            </div>
+                          )}
+
+                          {docPath ? (
+                            <a href={docPath} target="_blank" rel="noreferrer" className="p-4 bg-slate-950 text-white rounded-2xl hover:bg-emerald-600 transition-all shadow-lg">
+                              <ExternalLink size={18} />
+                            </a>
+                          ) : (
+                            <div className="p-4 bg-slate-100 text-slate-300 rounded-2xl cursor-not-allowed" title="No document">
+                              <ExternalLink size={18} />
+                            </div>
+                          )}
+                        </div>
                       </div>
+
+                      {/* AI Match Details (expandable) */}
+                      {aiDetails && (
+                        <div className="bg-indigo-50/50 rounded-2xl p-5 border border-indigo-100 mt-1">
+                          <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-2">🤖 AI Analysis</p>
+                          <div className="space-y-1">
+                            {aiDetails.split('\n').map((line, i) => (
+                              <p key={i} className="text-xs font-semibold text-slate-700">{line}</p>
+                            ))}
+                          </div>
+                          {/* Show extracted key data */}
+                          {aiExtracted && Object.keys(aiExtracted).length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-indigo-100">
+                              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">Extracted Data</p>
+                              <div className="flex flex-wrap gap-3">
+                                {Object.entries(typeof aiExtracted === 'object' && aiExtracted.toJSON ? aiExtracted.toJSON() : aiExtracted).map(([k, v]) => v ? (
+                                  <div key={k} className="bg-white px-3 py-1.5 rounded-xl border border-indigo-100">
+                                    <span className="text-[8px] text-indigo-400 font-bold uppercase">{k}: </span>
+                                    <span className="text-[11px] font-black text-slate-800">{String(v)}</span>
+                                  </div>
+                                ) : null)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

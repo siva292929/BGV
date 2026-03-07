@@ -17,6 +17,8 @@ const BGVRequestSchema = new mongoose.Schema({
     finalizedBy: { type: String },
 
     hrData: {
+        aadharNumber: String,
+        panNumber: String,
         tenthPercentage: String,
         twelfthPercentage: String,
         degreeGPA: String,
@@ -33,18 +35,34 @@ const BGVRequestSchema = new mongoose.Schema({
     },
 
     reviews: {
-        aadhar: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        pan: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        degree: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        twelfth: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        tenth: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        experience: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        payslip: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        releasingLetter: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        addressProof: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        bankStatement: { status: { type: Number, default: REVIEW.PENDING }, comment: String },
-        signature: { status: { type: Number, default: REVIEW.PENDING }, comment: String }
-    }
+        aadhar: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        pan: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        degree: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        twelfth: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        tenth: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        experience: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        payslip: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        releasingLetter: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        addressProof: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        bankStatement: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String },
+        signature: { status: { type: Number, default: REVIEW.PENDING }, comment: String, verifiedBy: String }
+    },
+
+    // AI OCR Verification Results
+    aiProcessed: { type: Boolean, default: false },
+    aiVerification: {
+        type: Map,
+        of: {
+            extractedText: String,
+            extractedData: { type: Map, of: mongoose.Schema.Types.Mixed },
+            confidence: { type: Number, default: 0 },
+            verdict: { type: Number, default: 0 },
+            matchDetails: String,
+            processedAt: Date
+        },
+        default: {}
+    },
+    executiveSummary: { type: String }
 }, { timestamps: true });
 
 module.exports = mongoose.model('BGVRequest', BGVRequestSchema);

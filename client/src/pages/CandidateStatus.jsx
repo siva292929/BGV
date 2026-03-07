@@ -131,15 +131,13 @@ const CandidateStatus = () => {
 
   const progressPercentage = Math.round((status.progress.verified / status.progress.total) * 100);
 
-  const getDisplayStatus = () => {
-    if (status.isFinalized) return status.status;
-    return 'Under Review';
-  };
+  const displayStatus = status.isFinalized ? status.status : STATUS.UNDER_REVIEW;
+  const displayLabel = STATUS_LABELS[displayStatus];
 
   const statusColors = {
-    'Verified': 'bg-green-600 text-white',
-    'Rejected': 'bg-red-600 text-white',
-    'Under Review': 'bg-amber-600 text-white'
+    [STATUS.VERIFIED]: 'bg-green-600 text-white',
+    [STATUS.REJECTED]: 'bg-red-600 text-white',
+    [STATUS.UNDER_REVIEW]: 'bg-amber-600 text-white'
   };
 
   const getStatusIcon = (docStatus) => {
@@ -186,8 +184,8 @@ const CandidateStatus = () => {
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 mb-8 space-y-8">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider ${statusColors[getDisplayStatus()]}`}>
-                {getDisplayStatus()}
+              <span className={`px-6 py-2 rounded-full font-bold text-sm uppercase tracking-wider ${statusColors[displayStatus]}`}>
+                {displayLabel}
               </span>
               {status.isFinalized && (
                 <span className="px-6 py-2 rounded-full bg-blue-600/20 text-blue-200 font-bold text-sm uppercase tracking-wider">
@@ -272,7 +270,12 @@ const CandidateStatus = () => {
                     <div>
                       <p className="text-white font-bold capitalize">{docLabels[docType] || docType}</p>
                       {review.comment && (
-                        <p className="text-slate-400 text-sm mt-1">{review.comment}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-slate-400 text-sm">{review.comment}</p>
+                          {review.comment.includes('AI Auto-Verified') && (
+                            <span className="bg-indigo-600/30 text-indigo-300 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase">🤖 AI</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -362,7 +365,7 @@ const CandidateStatus = () => {
               <CheckCircle size={20} /> Verification Complete!
             </div>
           )}
-          {rejectedDocs.length > 0 && status.status !== 'Verified' && (
+          {rejectedDocs.length > 0 && status.status !== STATUS.VERIFIED && (
             <div className="bg-yellow-600/20 border border-yellow-600/50 text-yellow-300 px-8 py-4 rounded-2xl font-bold flex items-center gap-2">
               <AlertCircle size={20} /> {rejectedDocs.length} document(s) need re-upload
             </div>

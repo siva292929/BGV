@@ -104,13 +104,14 @@ const CandidatePortal = () => {
     const checkUserStatus = async () => {
       try {
         const res = await axios.get(`http://localhost:5000/api/candidate/status/${userId}`);
-        if (['Under Review', 'Verified', 'Rejected'].includes(res.data.status)) {
-          setAssignedAgentName(res.data.assignedAgent);
-          setCandidateStatus(res.data.status);
+        const { status, isPhoneVerified, phoneNumber, assignedAgent } = res.data;
+        if ([STATUS.UNDER_REVIEW, STATUS.VERIFIED, STATUS.REJECTED].includes(status)) {
+          setAssignedAgentName(assignedAgent);
+          setCandidateStatus(status);
           setCurrentStep(6);
-        } else if (res.data.isPhoneVerified) {
-          setPhoneNumber(res.data.phoneNumber);
-          handleAutoFetch(res.data.phoneNumber);
+        } else if (isPhoneVerified) {
+          setPhoneNumber(phoneNumber);
+          handleAutoFetch(phoneNumber);
           setCurrentStep(1);
         }
       } catch (err) {
